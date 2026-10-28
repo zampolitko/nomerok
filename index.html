@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Блатной Номерок</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0820">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚘%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=mvrhslu2">
+</head>
+<body>
+<canvas id="fx"></canvas>
+
+<div id="app">
+  <header>
+    <div id="logo">БЛАТНОЙ НОМЕРОК</div>
+    <div id="lvlBox">
+      <div class="lvlTop"><span class="lvlBadge">УР. <b id="lvlNum">1</b></span><span id="lvlTitle"></span></div>
+      <div class="lvlBar"><div id="lvlFill"></div></div>
+    </div>
+    <div id="money" title="Кошелёк текущей страны"><span id="moneyCur">₽</span> <b id="moneyVal">0</b><small id="money2"></small></div>
+    <button class="navbtn" id="btnPhone" title="Телефон — Блатной Рынок">📱<b id="phoneBadge" class="hidden">0</b></button>
+    <button class="navbtn" id="btnMenu">☰</button>
+    <nav id="mainMenu" class="hidden">
+      <button class="menuItem" id="btnGarage">🏠 Гараж</button>
+      <button class="menuItem" id="btnColl">🏆 Коллекции</button>
+      <button class="menuItem" id="btnCombos">📒 Сочетания</button>
+      <button class="menuItem" id="btnShop">🛒 Магазин</button>
+      <button class="menuItem" id="btnExchange">💱 Обменник</button>
+      <button class="menuItem" id="btnProfile">👤 Профиль</button>
+      <button class="menuItem" id="btnSettings">⚙ Настройки</button>
+      <button class="menuItem" id="btnDev">🛠 Разработчик</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="stage">
+      <div id="raidBanner" class="hidden"></div>
+      <div id="showcase" class="hidden">
+        <div class="scLabel">⭐ витрина</div>
+        <div id="showcasePlate"></div>
+      </div>
+      <div id="vipBanner" class="hidden"></div>
+      <div id="rarityTop">
+        <div class="rtRow"><span id="riRarity"></span><span id="riChance"></span></div>
+        <div id="riBars"></div>
+      </div>
+      <div id="plateBox"></div>
+      <div id="plateCaption"></div>
+      <div id="bdSlot"><div id="breakdown"></div></div>
+      <div id="resultInfo">
+        <span id="riNew"></span>
+        <span id="riReward"></span>
+        <button id="bragBtn" class="hidden">📸 Похвастаться</button>
+      </div>
+      <div id="actionSlot">
+        <div id="choiceRow" class="hidden">
+          <button id="btnSell">💰 Продать</button>
+          <button id="btnKeep">🏠 В гараж</button>
+          <div id="choiceHint">Пробел — продать · Enter — в гараж</div>
+        </div>
+        <button id="spinBtn">КРУТИТЬ</button>
+      </div>
+      <label id="autoRow" class="hidden"><input type="checkbox" id="autoChk"> автокрутка</label>
+      <div id="pityRow">
+        <span>без легендарного: <b id="pityLeg">0</b></span>
+        <span id="chargeInfo"></span>
+      </div>
+      <div id="bottomBtns">
+        <button id="modeBtn">🚗 Тип: Гражданские</button>
+        <button id="regBtn">📍 Регион: Любой</button>
+        <button id="vipBtn">💎 Гарант: выкл</button>
+      </div>
+    </section>
+
+    <aside id="feedBox">
+      <h3>Последние</h3>
+      <div id="feed"></div>
+    </aside>
+  </main>
+
+  <footer id="statsBar">
+    <span>круток: <b id="stSpins">0</b></span>
+    <span>уникальных: <b id="stUniq">0</b></span>
+    <span>лучший: <span id="stBest">—</span></span>
+  </footer>
+</div>
+
+<!-- Гараж -->
+<div id="garage" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>🏠 Гараж</h2><button class="closeBtn" data-close="garage">✕</button></div>
+    <div class="panelBody" id="garageBody"></div>
+  </div>
+</div>
+
+<!-- Магазин -->
+<div id="shop" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>🛒 Магазин улучшений</h2><button class="closeBtn" data-close="shop">✕</button></div>
+    <div class="panelBody" id="shopBody"></div>
+  </div>
+</div>
+
+<!-- Профиль -->
+<div id="profile" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>👤 Профиль</h2><button class="closeBtn" data-close="profile">✕</button></div>
+    <div class="panelBody" id="profileBody"></div>
+  </div>
+</div>
+
+<!-- Меню разработчика -->
+<div id="dev" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>🛠 Меню разработчика</h2><button class="closeBtn" data-close="dev">✕</button></div>
+    <div class="panelBody" id="devBody"></div>
+  </div>
+</div>
+
+<!-- Обменник ₽ ⇄ $ -->
+<div id="exchange" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>💱 Обменник</h2><button class="closeBtn" data-close="exchange">✕</button></div>
+    <div class="panelBody" id="exchangeBody"></div>
+  </div>
+</div>
+
+<!-- Тип номеров -->
+<div id="modes" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>Тип номеров</h2><button class="closeBtn" data-close="modes">✕</button></div>
+    <div class="panelBody" id="modesBody"></div>
+  </div>
+</div>
+
+<!-- Коллекции: словарь, именные легенды, секретные номера -->
+<div id="coll" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>🏆 Коллекции</h2><button class="closeBtn" data-close="coll">✕</button></div>
+    <div class="panelBody" id="collBody"></div>
+  </div>
+</div>
+
+<!-- Выбор гаранта -->
+<div id="vips" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>💎 VIP-гарант</h2><button class="closeBtn" data-close="vips">✕</button></div>
+    <div class="panelBody" id="vipsBody"></div>
+  </div>
+</div>
+
+<!-- Коллекция сочетаний -->
+<div id="combos" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>📒 Коллекция сочетаний</h2><button class="closeBtn" data-close="combos">✕</button></div>
+    <div class="panelBody" id="combosBody"></div>
+  </div>
+</div>
+
+<!-- Выбор региона -->
+<div id="regions" class="overlay hidden">
+  <div class="panel">
+    <div class="panelHead"><h2 id="regionsTitle">📍 Выбор региона</h2><button class="closeBtn" data-close="regions">✕</button></div>
+    <div class="panelBody" id="regionsBody"></div>
+  </div>
+</div>
+
+<!-- Настройки -->
+<div id="settings" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>⚙ Настройки</h2><button class="closeBtn" data-close="settings">✕</button></div>
+    <div class="panelBody" id="settingsBody"></div>
+  </div>
+</div>
+
+<!-- Чёрный конверт (мифик и секрет): интрига с посимвольным раскрытием -->
+<div id="darkReveal" class="hidden">
+  <div id="drGlow"></div>
+  <div id="drContent">
+    <div id="drPlate"></div>
+    <div id="drTitle" class="hidden"></div>
+    <div id="drSub">что-то очень редкое…</div>
+  </div>
+</div>
+
+<!-- Момент славы (легендарка+) -->
+<div id="bigMoment" class="hidden">
+  <div id="bmRays"></div>
+  <div id="bmContent">
+    <div id="bmTitle"></div>
+    <div id="bmPlate"></div>
+    <div id="bmSub">нажми, чтобы продолжить</div>
+  </div>
+</div>
+
+<!-- Телефон: Блатной Рынок -->
+<div id="phone" class="hidden">
+  <div class="phFrame"><div class="phScreen" id="phScreen"></div><div class="phHome"></div></div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="js/config.js?v=mvrhslu2"></script>
+<script src="js/plates.js?v=mvrhslu2"></script>
+<script src="js/state.js?v=mvrhslu2"></script>
+<script src="js/audio.js?v=mvrhslu2"></script>
+<script src="js/fx.js?v=mvrhslu2"></script>
+<script src="js/ui.js?v=mvrhslu2"></script>
+<script src="js/market.js?v=mvrhslu2"></script>
+<script src="js/phone.js?v=mvrhslu2"></script>
+<script src="js/main.js?v=mvrhslu2"></script>
+<script src="js/tg.js?v=mvrhslu2"></script>
+</body>
+</html>
