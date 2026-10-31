@@ -5,19 +5,31 @@ const UI = (() => {
 
   // --- деньги: рубли или доллары (по номеру или по коду валюты) ---
   function money(v, plateOrCur) {
-    const cur = plateOrCur === 'usd' || plateOrCur === 'rub' ? plateOrCur : State.curOfPlate(plateOrCur);
-    return cur === 'usd' ? `$${fmt(v)}` : `${fmt(v)} ₽`;
+    const cur = ['usd', 'rub', 'aed'].includes(plateOrCur) ? plateOrCur : State.curOfPlate(plateOrCur);
+    return cur === 'usd' ? `$${fmt(v)}` : cur === 'aed' ? `${fmt(v)} AED` : `${fmt(v)} ₽`;
   }
   // номер текстом (для тостов): у США — «CA 7ABC123»
   function plateText(plate) {
-    if (!Plates.isUS(plate)) return plate;
+    const dv = Plates.divineOf(plate);
+    if (dv) return `«${dv.name}» ${dv.show}`;
     const p = Plates.parse(plate);
+    if (p.ae) return `${CFG.AE_EM[p.em].en} ${p.code} ${p.num}`;
+    if (!p.us) return plate;
     return `${p.st} ${p.raw}`;
   }
 
   // --- отрисовка таблички ---
   function plateHTML(plate, rarity, extraCls = '') {
     const p = Plates.parse(plate);
+    if (rarity === 'divine') extraCls = extraCls.replace('blackPlate', '') + ' goldPlate';
+    if (p.dv) return divinePlateHTML(p.key, rarity, extraCls);
+    if (p.ae) {
+      const e = CFG.AE_EM[p.em] || CFG.AE_EMIRATES[0];
+      return `<div class="plate aePlate r-${rarity} ${extraCls}">
+        <div class="aeLeft"><span class="aeEn">${e.en}</span><span class="aeAr">${e.ar}</span></div>
+        <div class="aeMain"><b class="aeCode">${p.code}</b><span class="aeNum">${p.num}</span></div>
+      </div>`;
+    }
     if (p.us) { // США: название штата сверху, номер, прозвище снизу; цвета штата
       const st = CFG.US_STATE[p.st] || CFG.US_STATES[0];
       return `<div class="plate usPlate r-${rarity} ${p.van ? 'usVanity' : ''} ${extraCls}"
@@ -27,20 +39,53 @@ const UI = (() => {
         <div class="usNick">${st.nick}</div>
       </div>`;
     }
+    // каждый символ в своей ячейке фиксированной ширины: шрифт номеров не моноширинный,
+    // и без ячеек табличка меняет ширину от номера к номеру — дёргается при прокрутке
+    const cells = str => [...str].map(c => `<i>${c}</i>`).join('');
     if (p.mil) { // военный: чёрная табличка «1234 АВ | 77 RUS», без флага
       return `<div class="plate milPlate r-${rarity} ${extraCls}">
-        <div class="p-main"><span class="p-d">${p.d}</span><span class="p-l">${p.ls}</span></div>
-        <div class="p-reg"><div class="p-regnum">${p.reg}</div><div class="p-rus">RUS</div></div>
+        <div class="p-main"><span class="p-d">${cells(p.d)}</span><span class="p-l">${cells(p.ls)}</span></div>
+        <div class="p-reg"><div class="p-regnum">${cells(p.reg)}</div><div class="p-rus">RUS</div></div>
       </div>`;
     }
     return `<div class="plate r-${rarity} ${extraCls}">
-      <div class="p-main"><span class="p-l">${p.l1}</span><span class="p-d">${p.d}</span><span class="p-l">${p.l2}</span></div>
-      <div class="p-reg"><div class="p-regnum">${p.reg}</div><div class="p-rus">RUS<span class="p-flag"></span></div></div>
+      <div class="p-main"><span class="p-l">${cells(p.l1)}</span><span class="p-d">${cells(p.d)}</span><span class="p-l">${cells(p.l2)}</span></div>
+      <div class="p-reg"><div class="p-regnum">${cells(p.reg)}</div><div class="p-rus">RUS<span class="p-flag"></span></div></div>
     </div>`;
   }
+  // четыре божественных номера — форматы, которых не бывает
+  function divinePlateHTML(key, rarity, cls) {
+    const cells = str => [...str].map(c => `<i>${c}</i>`).join('');
+    if (key === 'ru') return `<div class="plate dvPlate dv-ru r-${rarity} ${cls}">
+        <div class="p-main"><span class="p-d">${cells('777777')}</span></div>
+        <div class="p-reg"><div class="p-regnum">${cells('777')}</div><div class="p-rus">RUS<span class="p-flag"></span></div></div>
+      </div>`;
+    if (key === 'mil') return `<div class="plate milPlate dvPlate dv-mil r-${rarity} ${cls}">
+        <div class="p-main"><span class="p-d">${cells('0000')}</span><span class="p-l">${cells('ОО')}</span></div>
+        <div class="p-reg"><div class="p-regnum">${cells('00')}</div><div class="p-rus">RUS</div></div>
+      </div>`;
+    if (key === 'us') {
+      const st = CFG.US_STATE.CA;
+      return `<div class="plate usPlate dvPlate dv-us r-${rarity} ${cls}" style="--ubg:${st.bg};--ufg:${st.fg};--uac:${st.ac}">
+        <div class="usTop">${st.name}</div><div class="usText dvVoid">&nbsp;</div><div class="usNick">${st.nick}</div>
+      </div>`;
+    }
+    const e = CFG.AE_EM.DXB;
+    return `<div class="plate aePlate dvPlate dv-ae r-${rarity} ${cls}">
+        <div class="aeLeft"><span class="aeEn">${e.en}</span><span class="aeAr">${e.ar}</span></div>
+        <div class="aeMain"><span class="aeNum">0</span></div>
+      </div>`;
+  }
+
   // подпись под табличкой: регион или код войск
   function plateCaption(plate) {
+    const dv = Plates.divineOf(plate);
+    if (dv) return `✨ «${dv.name}» · ${dv.where.split(' · ')[0]} · единственный на всю игру`;
     const code = Plates.codeOf(plate);
+    if (Plates.isAE(plate)) {
+      const e = CFG.AE_EM[code], p = Plates.parse(plate);
+      return `${e.name} · ${CFG.AE_TIERS[e.tier].name.toLowerCase()} · ${p.len} ${p.len === 1 ? 'цифра' : p.len < 5 ? 'цифры' : 'цифр'}`;
+    }
     if (Plates.isUS(plate)) {
       const st = CFG.US_STATE[code];
       const t = CFG.US_TIERS[st.tier];
@@ -55,7 +100,8 @@ const UI = (() => {
   function placeholder() {
     const s = State.get();
     if (s.mode === 'us') return 'US:' + (s.us.state || 'CA') + ':• • • • • • •';
-    return s.mode === 'mil' ? '····АА10' : 'А···АА77';
+    if (s.mode === 'ae') return 'AE:' + (s.ae.em || 'DXB') + ':?:•••••';
+    return s.mode === 'mil' ? '····АА' + (s.milCode || '10') : 'А···АА' + (s.region || '77');
   }
 
   function showPlate(plate, rarity, cls = '') {
@@ -128,7 +174,8 @@ const UI = (() => {
     rr.textContent = rc.name.toUpperCase();
     rr.style.color = rc.color;
     rr.style.textShadow = `0 0 14px ${rc.color}`;
-    const chance = Plates.isUS(res.plate) ? CFG.US.CHANCES[res.tier] : Plates.isMil(res.plate) ? CFG.MIL.CHANCES[res.tier] : rc.chance;
+    const chance = Plates.isAE(res.plate) ? CFG.AE.CHANCES[res.tier] : Plates.isUS(res.plate) ? CFG.US.CHANCES[res.tier]
+      : Plates.isMil(res.plate) ? CFG.MIL.CHANCES[res.tier] : rc.chance;
     $('riChance').textContent = chance ? `1 к ${fmt(chance)}` : 'каждый второй';
     $('riBars').innerHTML = CFG.RARITIES.map((_, i) =>
       `<span class="riBar ${i <= res.tier ? 'on' : ''}" style="${i <= res.tier ? `background:${rc.color};box-shadow:0 0 8px ${rc.color}` : ''}"></span>`
@@ -151,18 +198,19 @@ const UI = (() => {
     $('riReward').textContent = '';
 
     // разбивка: НАСТОЯЩИЕ множители сочетаний, по строке за раз, цена нарастает
-    const us = Plates.isUS(res.plate);
-    const mil = Plates.isMil(res.plate);
+    const us = Plates.isUS(res.plate), ae = Plates.isAE(res.plate);
+    const mil = Plates.isMil(res.plate), dvp = Plates.divineOf(res.plate);
     // множитель места: регион России или тир штата США; у военных его нет
-    const rt = us ? Object.assign({}, CFG.US_TIERS[CFG.US_STATE[reg].tier], { name: 'штат: ' + CFG.US_TIERS[CFG.US_STATE[reg].tier].name })
-      : mil ? null : CFG.REG_TIER[reg];
-    const multLvl = State.get().up.mult;
+    const rt = ae ? Object.assign({}, CFG.AE_TIERS[CFG.AE_EM[reg].tier], { name: 'эмират: ' + CFG.AE_TIERS[CFG.AE_EM[reg].tier].name })
+      : us ? Object.assign({}, CFG.US_TIERS[CFG.US_STATE[reg].tier], { name: 'штат: ' + CFG.US_TIERS[CFG.US_STATE[reg].tier].name })
+      : mil ? Object.assign({}, CFG.MIL_CODE_TIER[reg], { name: 'код войск: ' + CFG.MIL_CODE_TIER[reg].name }) : CFG.REG_TIER[reg];
+    const multLvl = 0; // «Множитель ₽» убран из игры
     const sec = Plates.secretOf(res.plate);
     const blat = Plates.blatOf(res.plate);
     const legendName = Plates.mythicName(res.plate);
-    const base = us ? CFG.US.PLATE_BASE : mil ? CFG.MIL.PLATE_BASE : CFG.PLATE_BASE;
+    const base = dvp ? dvp.price : ae ? CFG.AE.PLATE_BASE : us ? CFG.US.PLATE_BASE : mil ? CFG.MIL.PLATE_BASE : CFG.PLATE_BASE;
     let running = base;
-    const steps = [{ label: us ? 'Базовый американский номер' : mil ? 'Базовый военный номер' : 'Базовый номер',
+    const steps = [{ label: dvp ? `✨ Божественный номер «${dvp.name}»` : ae ? 'Базовый номер Эмиратов' : us ? 'Базовый американский номер' : mil ? 'Базовый военный номер' : 'Базовый номер',
       val: money(base, res.plate), price: running }];
     for (const c of Plates.combosOf(res.plate)) {
       running *= c.mult;
@@ -178,10 +226,15 @@ const UI = (() => {
       steps.push({ label: `Секретный номер «${sec.name}»`, val: '×' + fmt(Math.round(k)), price: running });
     }
     if (legendName) steps.push({ label: `Именная легенда «${legendName}»`, val: '✦', price: null });
+    const tb = Plates.tierBonus(res.plate);
+    if (tb > 1) {
+      running *= tb;
+      steps.push({ label: `Надбавка за редкость (${CFG.RARITIES[Plates.tierOf(res.plate)].name.toLowerCase()})`, val: '×' + tb, price: running });
+    }
     if (State.isUnique(res.plate)) steps.push({ label: '🔒 Единственный экземпляр в игре', val: '✦', price: null });
     if (rt && rt.sellMult > 1) {
       running *= rt.sellMult;
-      steps.push({ label: us ? rt.name[0].toUpperCase() + rt.name.slice(1) : `Регион ${rt.name.toLowerCase()}`,
+      steps.push({ label: us || mil || ae ? rt.name[0].toUpperCase() + rt.name.slice(1) : `Регион ${rt.name.toLowerCase()}`,
         val: '×' + rt.sellMult, price: running });
     }
     if (multLvl > 0) {
@@ -254,12 +307,25 @@ const UI = (() => {
   // --- выбор региона: кнопка снизу + меню как гараж ---
   function refreshRegBtn() {
     const s = State.get();
+    if (s.mode === 'ae') {
+      const e = s.ae.em ? CFG.AE_EM[s.ae.em] : null, et = e ? CFG.AE_TIERS[e.tier] : null;
+      $('regBtn').innerHTML = e ? `🏙 Эмират: <b>${e.name}</b> <span class="rbInfo">крутка ×${et.costMult} · продажа ×${et.sellMult}</span>`
+        : `🏙 Эмират: Любой <span class="rbInfo">случайный, без наценки</span>`;
+      return;
+    }
     if (s.mode === 'us') { // в США та же кнопка выбирает штат
       const st = s.us.state ? CFG.US_STATE[s.us.state] : null;
       const t = st ? CFG.US_TIERS[st.tier] : null;
       $('regBtn').innerHTML = st
         ? `🗽 Штат: <b>${st.name}</b> <span class="rbInfo">крутка ×${t.costMult} · продажа ×${t.sellMult}</span>`
         : `🗽 Штат: Любой <span class="rbInfo">случайный, без наценки</span>`;
+      return;
+    }
+    if (s.mode === 'mil') { // у военных та же кнопка выбирает код войск
+      const ct = s.milCode ? CFG.MIL_CODE_TIER[s.milCode] : null;
+      $('regBtn').innerHTML = ct
+        ? `🎖 Код войск: <b>${s.milCode}</b> <span class="rbInfo">крутка ×${ct.costMult} · продажа ×${ct.sellMult}</span>`
+        : `🎖 Код войск: Любой <span class="rbInfo">случайный, без наценки</span>`;
       return;
     }
     const t = s.region ? CFG.REG_TIER[s.region] : null;
@@ -340,6 +406,78 @@ const UI = (() => {
         Snd.open();
         toast(btn.dataset.reg ? `Регион ${btn.dataset.reg} выбран` : 'Регион: любой');
         closeOverlay('regions');
+        refreshHUD();
+      };
+    });
+  }
+
+  // меню эмиратов (как штаты США)
+  function renderEmirates() {
+    const s = State.get();
+    const icons = { t2: '🏙', t1: '🕌', t0: '🏜' };
+    let html = `<button class="regAny ${s.ae.em ? '' : 'regPicked'}" data-em="">
+      <span class="regAnyTitle">🎲 Любой эмират</span>
+      <span class="regAnySub">эмират выпадает случайно: 60% северные · 25% Шарджа · 15% Дубай и Абу-Даби</span>
+    </button>`;
+    for (const key of ['t2', 't1', 't0']) {
+      const tt = CFG.AE_TIERS[key];
+      html += `<div class="regTierHead"><span class="regTierName">${icons[key]} ${tt.name}</span>
+        <span class="regTierInfo">крутка ×${tt.costMult} · продажа ×${tt.sellMult}</span></div><div class="regList">` +
+        CFG.AE_EMIRATES.filter(e => e.tier === key).map(e => `<button class="regRow ${s.ae.em === e.em ? 'regPicked' : ''}" data-em="${e.em}">
+          ${plateHTML(Plates.aePlate(e.em, 'A', '12345'), 'common', 'aeMini')}
+          <span class="rrName">${e.name} <small class="gMeta">· ${e.ar}</small></span>
+          <span class="rrPrice">крутка ×${tt.costMult}</span>
+        </button>`).join('') + '</div>';
+    }
+    $('regionsBody').innerHTML = html;
+    $('regionsBody').querySelectorAll('[data-em]').forEach(btn => {
+      btn.onclick = () => {
+        State.setAeEm(btn.dataset.em || null);
+        Snd.open();
+        toast(btn.dataset.em ? `Эмират ${CFG.AE_EM[btn.dataset.em].name} выбран` : 'Эмират: любой');
+        closeOverlay('regions');
+        showPlate(placeholder(), 'common');
+        refreshHUD();
+      };
+    });
+  }
+
+  // меню кодов войск (военные) — как регионы: тиры с наценкой и множителем продажи
+  const MIL_LOOK = {
+    t0: { icon: '🪖', hint: 'Обычные части. Без наценки за престиж.' },
+    t1: { icon: '🗺', hint: 'Коды округов. Солидно.' },
+    t2: { icon: '🎖', hint: 'Гвардейские коды — двойные цифры.' },
+    t3: { icon: '⭐', hint: 'Генштаб. Выше только небо.' },
+  };
+  function renderMilCodes() {
+    const s = State.get();
+    let html = `<button class="regAny ${s.milCode ? '' : 'regPicked'}" data-code="">
+      <span class="regAnyTitle">🎲 Любой код</span>
+      <span class="regAnySub">код выпадает случайно: 85% обычные · 10% округа · 4% гвардия · 1% генштаб</span>
+    </button>`;
+    for (const t of [...CFG.MIL_CODE_TIERS].reverse()) {
+      const look = MIL_LOOK[t.key];
+      html += `<div class="regTierHead">
+        <span class="regTierName">${look.icon} ${t.name}</span>
+        <span class="regTierInfo">крутка ×${t.costMult} · продажа ×${t.sellMult}</span>
+        <span class="regTierHint">${look.hint}</span>
+      </div>
+      <div class="regList">` +
+        t.codes.map(c => `<button class="regRow ${s.milCode === c ? 'regPicked' : ''}" data-code="${c}">
+          <span class="regCard milCard tier-${t.key}"><span class="rcNum">${c}</span><span class="rcRus">RUS</span></span>
+          <span class="rrName">Код войск ${c}</span>
+          <span class="rrPrice">крутка ×${t.costMult}</span>
+        </button>`).join('') +
+      `</div>`;
+    }
+    $('regionsBody').innerHTML = html;
+    $('regionsBody').querySelectorAll('[data-code]').forEach(btn => {
+      btn.onclick = () => {
+        State.setMilCode(btn.dataset.code || null);
+        Snd.open();
+        toast(btn.dataset.code ? `Код войск ${btn.dataset.code} выбран` : 'Код войск: любой');
+        closeOverlay('regions');
+        showPlate(placeholder(), 'common');
         refreshHUD();
       };
     });
@@ -445,12 +583,16 @@ const UI = (() => {
   // --- тип номеров: гражданские / военные / США ---
   function refreshModeBtn() {
     const m = State.get().mode;
-    $('modeBtn').innerHTML = m === 'us' ? `🗽 Тип: <b>США</b> <span class="rbInfo">доллары</span>`
-      : m === 'mil' ? `🪖 Тип: <b>Военные</b> <span class="rbInfo">крутка ×${CFG.MIL.COST_MULT}</span>`
-      : `🚗 Тип: <b>Гражданские</b>`;
-    $('modeBtn').classList.toggle('modeMil', m === 'mil');
+    // страна: Россия / США; тип (гражданские / военные) — отдельная кнопка, только для России
+    $('modeBtn').innerHTML = m === 'us' ? `🇺🇸 Страна: <b>США</b> <span class="rbInfo">доллары</span>`
+      : m === 'ae' ? `🇦🇪 Страна: <b>Эмираты</b> <span class="rbInfo">дирхамы</span>`
+      : `🇷🇺 Страна: <b>Россия</b> <span class="rbInfo">рубли</span>`;
     $('modeBtn').classList.toggle('modeUs', m === 'us');
-    $('regBtn').classList.toggle('hidden', m === 'mil'); // у военных код войск случайный
+    $('modeBtn').classList.toggle('modeAe', m === 'ae');
+    $('typeBtn').classList.toggle('hidden', m === 'us' || m === 'ae');
+    $('typeBtn').innerHTML = m === 'mil' ? `🪖 Тип: <b>Военные</b> <span class="rbInfo">крутка ×${CFG.MIL.COST_MULT}</span>`
+      : `🚗 Тип: <b>Гражданские</b>`;
+    $('typeBtn').classList.toggle('modeMil', m === 'mil');
   }
   function switchMode(mode, text) {
     State.setMode(mode);
@@ -459,32 +601,58 @@ const UI = (() => {
     Snd.open();
     toast(text);
     closeOverlay('modes');
+    closeOverlay('types');
     hideResult();
     showPlate(placeholder(), 'common');
     refreshHUD();
   }
-  function renderModes() {
-    const s = State.get();
-    const card = (mode, title, sample, desc, extra = '') => `<button class="modeCard ${s.mode === mode ? 'regPicked' : ''}" data-mode="${mode}">
+  const modeCard = (cur, mode, title, sample, desc, extra = '') => `<button class="modeCard ${cur ? 'regPicked' : ''}" data-mode="${mode}">
       <span class="mcTitle">${title}</span>
       ${plateHTML(sample, 'common')}
       <span class="mcDesc">${desc}</span>${extra}
     </button>`;
-    const visa = s.us.visa;
-    $('modesBody').innerHTML =
-      card('civ', '🚗 Гражданские', 'А123ВС77',
+  // тип номеров России
+  function renderTypes() {
+    const s = State.get();
+    $('typesBody').innerHTML =
+      modeCard(s.mode === 'civ', 'civ', '🚗 Гражданские', 'А123ВС77',
         `Белые таблички «А123ВС77». Регионы, блатные серии, слова, секретки. Крутка ${fmt(CFG.SPIN_COST)} ₽ × регион.`) +
-      card('mil', '🪖 Военные', '1945ВВ10',
+      modeCard(s.mode === 'mil', 'mil', '🪖 Военные', '1945ВВ10',
         `Чёрные таблички «1234 АВ 77». Четыре цифры: великие даты, годы, 7777, две пары, зеркала. ` +
-        `Крутка ${fmt(CFG.SPIN_COST * CFG.MIL.COST_MULT)} ₽, код войск случайный.`) +
-      card('us', visa ? '🗽 США' : '🗽 США 🔒', 'US:CA:7BOS777',
-        `15 штатов, именные таблички (BOSS, LUCKY7…), свои сочетания. Отдельный кошелёк в долларах, крутка $${CFG.US.SPIN_COST}.`,
+        `Крутка ${fmt(CFG.SPIN_COST * CFG.MIL.COST_MULT)} ₽ × код войск. Секреток у военных нет — потолок мифик.`) +
+      `<div class="gMeta">Номера не смешиваются: крутишь только выбранный тип. Гараж, уровни и заряды — общие.</div>`;
+    $('typesBody').querySelectorAll('[data-mode]').forEach(b => {
+      b.onclick = () => switchMode(b.dataset.mode, b.dataset.mode === 'mil' ? '🪖 Крутим военные номера' : '🚗 Крутим гражданские номера');
+    });
+  }
+  // страна
+  function renderModes() {
+    const s = State.get();
+    const visa = s.us.visa;
+    const ru = s.ruMode === 'mil' ? 'mil' : 'civ';
+    $('modesBody').innerHTML =
+      modeCard(s.mode !== 'us', ru, '🇷🇺 Россия', 'А777АА77',
+        `Гражданские и военные номера (тип выбирается отдельной кнопкой), регионы и коды войск, секретки. Кошелёк в рублях.`) +
+      modeCard(s.mode === 'us', 'us', visa ? '🇺🇸 США' : '🇺🇸 США 🔒', 'US:CA:7BOS777',
+        `15 штатов, именные таблички (BOSS, LUCKY7…), свои сочетания и секретки. Отдельный кошелёк в долларах, крутка $${CFG.US.SPIN_COST}.`,
         visa ? '' : `<span class="visaTag">Виза: ${fmt(CFG.US.VISA_PRICE)} ₽ · +$${fmt(CFG.US.START_USD)} на старт</span>`) +
-      `<div class="gMeta">Номера не смешиваются: крутишь только выбранный тип. Гараж, уровни и заряды — общие.
-      У России и США разные кошельки: обменивай в 💱 Обменнике (меню ☰).</div>`;
+      modeCard(s.mode === 'ae', 'ae', s.ae.visa ? '🇦🇪 Эмираты' : '🇦🇪 Эмираты 🔒', 'AE:DXB:P:7',
+        `Самые дорогие номера в мире: эмират, буквенный код и 1–5 цифр — чем короче, тем дороже. Однозначный — уже событие.
+        Кошелёк в дирхамах, крутка ${CFG.AE.SPIN_COST} AED.`,
+        s.ae.visa ? '' : `<span class="visaTag">Виза: ${fmt(CFG.AE.VISA_PRICE)} ₽ · +${fmt(CFG.AE.START_AED)} AED на старт</span>`) +
+      `<div class="gMeta">Гараж, уровни и заряды — общие для всех стран. Кошельки разные: обменивай в 💱 Обменнике (меню ☰).</div>`;
     $('modesBody').querySelectorAll('[data-mode]').forEach(b => {
       b.onclick = () => {
         const mode = b.dataset.mode;
+        if (mode === 'ae' && !State.get().ae.visa) {
+          if (State.buyVisaAE()) {
+            Snd.reward();
+            FX.rain(['#00732f', '#ffffff', '#ff0000', '#000000'], 160);
+            showEvents(State.checkNow());
+            switchMode('ae', `🇦🇪 Виза в Эмираты получена! +${fmt(CFG.AE.START_AED)} AED. Ahlan wa sahlan!`);
+          } else { Snd.deny(); toast(`На визу в Эмираты нужно ${fmt(CFG.AE.VISA_PRICE)} ₽`); }
+          return;
+        }
         if (mode === 'us' && !State.get().us.visa) {
           if (State.buyVisa()) {
             Snd.reward();
@@ -497,8 +665,7 @@ const UI = (() => {
           }
           return;
         }
-        switchMode(mode, mode === 'us' ? '🗽 Крутим американские номера'
-          : mode === 'mil' ? '🪖 Крутим военные номера' : '🚗 Крутим гражданские номера');
+        switchMode(mode, mode === 'us' ? '🇺🇸 Крутим американские номера' : mode === 'ae' ? '🇦🇪 Крутим номера Эмиратов' : '🇷🇺 Крутим российские номера');
       };
     });
   }
@@ -506,44 +673,42 @@ const UI = (() => {
   // --- обменник ₽ ⇄ $ ---
   function renderExchange() {
     const s = State.get();
-    const R = CFG.US.RATE, F = Math.round(CFG.US.FEE * 100);
-    if (!s.us.visa) {
-      $('exchangeBody').innerHTML = `<div class="gMeta">Обменник работает после покупки визы в США (меню «Тип номеров»).</div>`;
+    const pairs = [
+      s.us.visa && { cur: 'usd', fx: CFG.US, sign: '$', name: 'доллары' },
+      s.ae.visa && { cur: 'aed', fx: CFG.AE, sign: 'AED', name: 'дирхамы' },
+    ].filter(Boolean);
+    if (!pairs.length) {
+      $('exchangeBody').innerHTML = '<div class="gMeta">Обменник работает после покупки визы (меню «🌍 Страна»).</div>';
       return;
     }
-    $('exchangeBody').innerHTML = `
-      <div class="gSummary"><span>курс: <b>1 $ = ${R} ₽</b></span><span>комиссия: <b>${F}%</b></span></div>
-      <div class="exRow">
-        <span>₽ → $</span>
-        <input type="number" id="exRub" min="0" step="1000" placeholder="сколько рублей">
-        <button class="ocGive" id="exRubBtn">Обменять</button>
-      </div>
-      <div class="gMeta" id="exRubQ">у тебя ${fmt(s.money)} ₽</div>
-      <div class="exRow">
-        <span>$ → ₽</span>
-        <input type="number" id="exUsd" min="0" step="10" placeholder="сколько долларов">
-        <button class="ocGive" id="exUsdBtn">Обменять</button>
-      </div>
-      <div class="gMeta" id="exUsdQ">у тебя $${fmt(s.us.usd)}</div>`;
-    const bind = (inp, q, dir, own) => {
-      $(inp).oninput = () => {
-        const v = Number($(inp).value) || 0;
-        $(q).textContent = `получишь ${dir === 'rub2usd' ? '$' + fmt(State.exchangeQuote(dir, v)) : fmt(State.exchangeQuote(dir, v)) + ' ₽'} · у тебя ${own()}`;
+    $('exchangeBody').innerHTML = pairs.map(pr => `
+      <div class="gSetTitle">₽ ⇄ ${pr.sign} <small>курс 1 ${pr.sign} = ${pr.fx.RATE} ₽ · комиссия ${Math.round(pr.fx.FEE * 100)}%</small></div>
+      <div class="exRow"><span>₽ → ${pr.sign}</span>
+        <input type="number" min="0" step="1000" placeholder="сколько рублей" data-ex="rub2${pr.cur}">
+        <button class="ocGive" data-go="rub2${pr.cur}">Обменять</button></div>
+      <div class="gMeta" data-q="rub2${pr.cur}">у тебя ${money(s.money, 'rub')}</div>
+      <div class="exRow"><span>${pr.sign} → ₽</span>
+        <input type="number" min="0" step="10" placeholder="сколько (${pr.name})" data-ex="${pr.cur}2rub">
+        <button class="ocGive" data-go="${pr.cur}2rub">Обменять</button></div>
+      <div class="gMeta" data-q="${pr.cur}2rub">у тебя ${money(State.balance(pr.cur), pr.cur)}</div>`).join('');
+    const body = $('exchangeBody');
+    body.querySelectorAll('[data-ex]').forEach(inp => {
+      inp.oninput = () => {
+        const dir = inp.dataset.ex, [from, to] = dir.split('2');
+        body.querySelector(`[data-q="${dir}"]`).textContent =
+          `получишь ${money(State.exchangeQuote(dir, Number(inp.value) || 0), to)} · у тебя ${money(State.balance(from), from)}`;
       };
-    };
-    bind('exRub', 'exRubQ', 'rub2usd', () => fmt(State.get().money) + ' ₽');
-    bind('exUsd', 'exUsdQ', 'usd2rub', () => '$' + fmt(State.get().us.usd));
-    const go = (inp, dir) => {
-      const got = State.exchange(dir, $(inp).value);
-      if (got) {
-        Snd.buy();
-        toast(`💱 Обменяно: +${dir === 'rub2usd' ? '$' + fmt(got) : fmt(got) + ' ₽'}`);
-      } else { Snd.deny(); toast('Не хватает денег или сумма слишком мала'); }
-      renderExchange();
-      refreshHUD();
-    };
-    $('exRubBtn').onclick = () => go('exRub', 'rub2usd');
-    $('exUsdBtn').onclick = () => go('exUsd', 'usd2rub');
+    });
+    body.querySelectorAll('[data-go]').forEach(btn => {
+      btn.onclick = () => {
+        const dir = btn.dataset.go, to = dir.split('2')[1];
+        const got = State.exchange(dir, body.querySelector(`[data-ex="${dir}"]`).value);
+        if (got) { Snd.buy(); toast(`💱 Обменяно: +${money(got, to)}`); }
+        else { Snd.deny(); toast('Не хватает денег или сумма слишком мала'); }
+        renderExchange();
+        refreshHUD();
+      };
+    });
   }
 
   // --- витрина ---
@@ -557,14 +722,42 @@ const UI = (() => {
     } else sc.classList.add('hidden');
   }
 
+  // --- кошелёк: плавный счётчик ---
+  let shownMoney = null, shownCur = null, moneyRaf = 0;
+  function animateMoney(target, cur) {
+    const el = $('moneyVal');
+    if (shownMoney === null || shownCur !== cur || State.get().settings.lowfx) {
+      shownMoney = target; shownCur = cur; el.textContent = fmt(target); return;
+    }
+    if (target === shownMoney) return;
+    const from = shownMoney, t0 = performance.now(), ms = 650;
+    const box = $('money');
+    box.classList.remove('mUp', 'mDown'); void box.offsetWidth;
+    box.classList.add(target > from ? 'mUp' : 'mDown');
+    shownMoney = target;
+    cancelAnimationFrame(moneyRaf);
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmt(Math.round(from + (target - from) * e));
+      if (k < 1) moneyRaf = requestAnimationFrame(step);
+    };
+    step();
+  }
+  // монеты летят из таблички в кошелёк
+  function coinsToWallet(n = 10) {
+    const a = $('plateBox').getBoundingClientRect(), b = $('money').getBoundingClientRect();
+    FX.coinsTo(a.left + a.width / 2, a.top + a.height / 2, b.left + b.width / 2, b.top + b.height / 2, n);
+  }
+
   // --- HUD ---
   function refreshHUD() {
     const s = State.get();
     // главный кошелёк — валюта текущего режима; второй мелко, если есть виза
-    const usMode = s.mode === 'us';
-    $('moneyCur').textContent = usMode ? '$' : '₽';
-    $('moneyVal').textContent = fmt(usMode ? s.us.usd : s.money);
-    $('money2').textContent = !s.us.visa ? '' : usMode ? `${fmt(s.money)} ₽` : `$${fmt(s.us.usd)}`;
+    const cur = State.curMode();
+    $('moneyCur').textContent = cur === 'usd' ? '$' : cur === 'aed' ? 'AED' : '₽';
+    animateMoney(State.balance(cur), cur);
+    $('money2').textContent = [cur !== 'rub' ? `${fmt(s.money)} ₽` : '', cur !== 'usd' && s.us.visa ? `$${fmt(s.us.usd)}` : '',
+      cur !== 'aed' && s.ae.visa ? `${fmt(s.ae.aed)} AED` : ''].filter(Boolean).join(' · ');
     const cost = State.spinCost();
     const curBal = State.balance(State.curMode());
     const charge = nextChargeInfo();
@@ -592,6 +785,8 @@ const UI = (() => {
     // уровень
     const need = State.xpNeed(s.level);
     $('lvlNum').textContent = s.level;
+    $('prestigeBadge').classList.toggle('hidden', !s.prestige);
+    $('prestigeBadge').textContent = s.prestige ? '⭐'.repeat(Math.min(3, s.prestige)) + (s.prestige > 3 ? s.prestige : '') : '';
     $('lvlTitle').textContent = State.levelTitle(s.level);
     $('lvlFill').style.width = Math.min(100, s.xp / need * 100) + '%';
     $('lvlBox').title = `Опыт: ${fmt(s.xp)} / ${fmt(need)}`;
@@ -605,8 +800,10 @@ const UI = (() => {
     $('stBest').innerHTML = s.best
       ? plateHTML(s.best.plate, CFG.RARITIES[s.best.tier].key)
       : '—';
-    $('pityLeg').textContent = s.pity.leg;
+    $('pityLeg').textContent = fmt(Math.max(0, CFG.PITY.LEG_HARD - s.pity.leg)) + (s.pity.leg >= CFG.PITY.LEG_SOFT ? ' 🔥' : '');
     $('autoRow').classList.toggle('hidden', s.up.auto === 0);
+    document.body.dataset.skin = (s.skins && s.skins.on) || '';
+    $('btnDaily').classList.toggle('menuDot', !!(s.login && !s.login.claimed));
     $('autoChk').checked = s.settings.autoOn;
   }
 
@@ -648,19 +845,42 @@ const UI = (() => {
     });
   }
 
-  // --- чёрный конверт: мифик/секрет раскрывается посимвольно ---
+  // --- раскрытие мифика / секретки / божественного ---
+  //  мифик: багровое зарево и угли, символы проявляются по одному, в конце — ВЗРЫВ
+  //  секретка: зелёный дождь 0101, табличка из «?», символы по очереди «взламываются» помехами
+  //  божественный — отдельный экран (divineReveal): свет, номер с крыльями и нимбом спускается, барабаны как в слотах
   function darkReveal(plate, rarity) {
+    if (rarity === 'divine') return divineReveal(plate);
     return new Promise(resolve => {
       const rc = CFG.RARITIES[CFG.TIER[rarity]];
       const p = Plates.parse(plate);
       const dr = $('darkReveal');
+      const secret = rarity === 'secret';
       dr.style.setProperty('--c', rc.color);
       $('drGlow').classList.remove('on');
       $('drTitle').classList.add('hidden');
-      $('drTitle').textContent = rc.name + ' номер!';
-      $('drSub').textContent = 'что-то очень редкое…';
-      const ch = (cls, s) => s.split('').map(c => `<span class="${cls} drCh">${c === ' ' ? '&nbsp;' : c}</span>`).join('');
-      if (p.us) { // США: название штата и прозвище видны, текст раскрывается по символу
+      dr.classList.remove('drGold', 'drDone');
+      dr.dataset.r = rarity;               // CSS: свой фон и эффекты
+      const fxTimers = [];
+      if (rarity === 'mythic') { // угольки поднимаются
+        FX.embers(['#fb7185', '#ff9a3c', '#ffd2d2'], 50);
+        fxTimers.push(setInterval(() => FX.embers(['#fb7185', '#ff9a3c'], 14), 600));
+      }
+      const stopMatrix = secret ? matrixRain(dr.querySelector('.drMatrix')) : () => {};
+      $('drTitle').textContent = secret ? '🔓 ДОСТУП ПОЛУЧЕН: СЕКРЕТНЫЙ НОМЕР' : rc.name + ' номер!';
+      $('drSub').textContent = secret ? 'взлом базы номеров…' : 'что-то очень редкое…';
+      // у секретки вместо символа сначала «?», настоящий символ — в data-c
+      const ch = (cls, s) => s.split('').map(c => {
+        const real = c === ' ' ? '&nbsp;' : c;
+        return `<span class="${cls} drCh" data-c="${real}">${secret ? '?' : real}</span>`;
+      }).join('');
+      if (p.ae) { // Эмираты: эмират виден, код и цифры раскрываются по символу
+        const e = CFG.AE_EM[p.em];
+        $('drPlate').innerHTML = `<div class="plate darkPlate aePlate aeDark">
+          <div class="aeLeft"><span class="aeEn">${e.en}</span><span class="aeAr">${e.ar}</span></div>
+          <div class="aeMain"><b class="aeCode">${ch('p-l', p.code)}</b><span class="aeNum">${ch('p-d', p.num)}</span></div>
+        </div>`;
+      } else if (p.us) { // США: название штата и прозвище видны, текст раскрывается по символу
         const st = CFG.US_STATE[p.st];
         $('drPlate').innerHTML = `<div class="plate darkPlate usPlate usDark">
           <div class="usTop">${st.name}</div>
@@ -673,32 +893,65 @@ const UI = (() => {
           : ch('p-l', p.l1) + ch('p-d', p.d) + ch('p-l', p.l2);
         $('drPlate').innerHTML = `<div class="plate darkPlate">
           <div class="p-main">${mainHtml}</div>
-          <div class="p-reg drCh"><div class="p-regnum">${p.reg}</div><div class="p-rus">RUS${p.mil ? '' : '<span class="p-flag"></span>'}</div></div>
+          <div class="p-reg"><div class="p-regnum">${ch('p-d', p.reg)}</div><div class="p-rus drCh">RUS${p.mil ? '' : '<span class="p-flag"></span>'}</div></div>
         </div>`;
       }
       dr.classList.remove('hidden');
 
       const spans = [...dr.querySelectorAll('.drCh')];
-      const timers = [];
+      const chars = spans.filter(sp => sp.dataset.c !== undefined);
+      if (secret) spans.forEach(sp => sp.classList.add('on', 'hackQ')); // «??????» видно сразу
+      const timers = [], scrambles = [];
       let finished = false, closed = false;
+      const POOL = '0123456789ABCDEFGHKMPTXАВЕКМНОРСТУХ#%&@$';
+
+      // секретка: символ «взламывается» — мелькают помехи, потом встаёт настоящий
+      function crack(sp, i) {
+        sp.classList.add('hacking');
+        const iv = setInterval(() => { sp.textContent = POOL[Math.floor(Math.random() * POOL.length)]; Snd.tick(); }, 55);
+        scrambles.push(iv);
+        timers.push(setTimeout(() => {
+          clearInterval(iv);
+          sp.innerHTML = sp.dataset.c;
+          sp.classList.remove('hacking', 'hackQ');
+          sp.classList.add('cracked');
+          Snd.suspense(i);
+        }, 520));
+      }
 
       function finish() {
         if (finished) return;
         finished = true;
         timers.forEach(clearTimeout);
-        spans.forEach(sp => sp.classList.add('on'));
+        scrambles.forEach(clearInterval);
+        spans.forEach(sp => {
+          sp.classList.add('on');
+          if (sp.dataset.c !== undefined) { sp.innerHTML = sp.dataset.c; sp.classList.remove('hacking', 'hackQ'); }
+        });
         $('drGlow').classList.add('on');
         $('drTitle').classList.remove('hidden');
         $('drSub').textContent = 'нажми, чтобы продолжить';
+        fxTimers.forEach(clearInterval);
+        dr.classList.add('drDone');
         Snd.boom();
         Snd.jingle(rarity);
-        FX.rain([rc.color, '#ffe17d', '#ffffff'], 160);
-        timers.push(setTimeout(close, 6000));
+        const cx = innerWidth / 2, cy = innerHeight / 2;
+        if (rarity === 'mythic') {
+          FX.explode(cx, cy); // взрыв вместо конфетти
+          FX.embers(['#ff7a2f', '#ffd166', '#ffffff'], 60);
+        } else if (secret) {
+          FX.shake(2); FX.ring(cx, cy, '#22c55e'); setTimeout(() => FX.ring(cx, cy, '#86efac', 560), 180);
+          FX.burst(cx, cy, ['#22c55e', '#86efac', '#ffffff'], 140, 1.6);
+        }
+        timers.push(setTimeout(close, 6500));
       }
       function close() {
         if (closed) return;
         closed = true;
         timers.forEach(clearTimeout);
+        scrambles.forEach(clearInterval);
+        fxTimers.forEach(clearInterval);
+        stopMatrix();
         dr.classList.add('hidden');
         dr.onclick = null;
         resolve();
@@ -707,23 +960,168 @@ const UI = (() => {
 
       // сценарий: чернота → цвет проявляется → символы по одному → финал
       timers.push(setTimeout(() => $('drGlow').classList.add('on'), 350));
-      spans.forEach((sp, i) => {
-        timers.push(setTimeout(() => {
-          sp.classList.add('on');
-          Snd.suspense(i);
-        }, 1000 + i * 480));
+      if (secret) {
+        chars.forEach((sp, i) => timers.push(setTimeout(() => crack(sp, i), 1300 + i * 700)));
+        spans.filter(sp => sp.dataset.c === undefined).forEach(sp => timers.push(setTimeout(() => sp.classList.remove('hackQ'), 1300 + chars.length * 700)));
+        timers.push(setTimeout(finish, 1300 + chars.length * 700 + 700));
+      } else {
+        spans.forEach((sp, i) => {
+          timers.push(setTimeout(() => {
+            sp.classList.add('on');
+            Snd.suspense(i);
+          }, 1000 + i * 480));
+        });
+        timers.push(setTimeout(finish, 1000 + spans.length * 480 + 500));
+      }
+    });
+  }
+
+  // зелёный «дождь» из 0 и 1 на канвасе (секретка). Возвращает функцию остановки
+  function matrixRain(cv) {
+    if (!cv || State.get().settings.lowfx) return () => {};
+    const cx = cv.getContext('2d');
+    const size = 18;
+    let cols = [], raf = 0, stopped = false;
+    const resize = () => {
+      cv.width = innerWidth; cv.height = innerHeight;
+      cols = Array.from({ length: Math.ceil(cv.width / size) }, () => Math.random() * -cv.height / size);
+    };
+    resize();
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, cv.width, cv.height);
+    let last = 0;
+    const step = t => {
+      if (stopped) return;
+      raf = requestAnimationFrame(step);
+      if (t - last < 45) return;
+      last = t;
+      cx.fillStyle = 'rgba(0, 0, 0, .12)';
+      cx.fillRect(0, 0, cv.width, cv.height);
+      cx.font = `700 ${size - 2}px Consolas, monospace`;
+      cols.forEach((y, i) => {
+        const x = i * size, yy = y * size;
+        cx.fillStyle = Math.random() < 0.06 ? '#d1fae5' : '#22c55e';
+        cx.fillText(Math.random() < 0.5 ? '0' : '1', x, yy);
+        cols[i] = yy > cv.height && Math.random() > 0.975 ? 0 : y + 1;
       });
-      timers.push(setTimeout(finish, 1000 + spans.length * 480 + 500));
+    };
+    raf = requestAnimationFrame(step);
+    return () => { stopped = true; cancelAnimationFrame(raf); cx.clearRect(0, 0, cv.width, cv.height); };
+  }
+
+  // крыло ангела (SVG): перья слоями, белые с золотой кромкой
+  const WING = `<svg viewBox="0 0 160 110" aria-hidden="true"><defs>
+      <linearGradient id="wingG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f3e3b0"/></linearGradient></defs>
+    <g fill="url(#wingG)" stroke="#d9a82e" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M150 20 C110 0 60 2 10 30 C40 34 70 36 150 34 Z"/>
+      <path d="M150 34 C105 22 55 30 6 58 C40 58 80 56 150 50 Z"/>
+      <path d="M150 50 C108 46 64 58 16 86 C52 82 92 74 150 64 Z"/>
+      <path d="M150 64 C116 68 84 82 46 106 C82 98 118 86 150 76 Z"/>
+    </g></svg>`;
+
+  // --- божественный: темнота → свет → номер с крыльями и нимбом спускается → символы крутятся барабанами слота ---
+  function divineReveal(plate) {
+    return new Promise(resolve => {
+      const dvp = Plates.divineOf(plate);
+      const el = $('divineReveal');
+      el.className = 'dvS0';
+      el.innerHTML = `<div class="dvLight"></div><div class="dvRays"></div>
+        <div class="dvAngel">
+          <div class="dvHalo"></div>
+          <div class="dvWing dvWingL">${WING}</div><div class="dvWing dvWingR">${WING}</div>
+          <div class="dvPlateBox">${divinePlateHTML(dvp.key, 'divine', 'goldPlate')}</div>
+        </div>
+        <div class="dvTitle"><small>✨ БОЖЕСТВЕННЫЙ НОМЕР ✨</small><b>«${dvp.name}»</b><span>${money(dvp.price, dvp.cur)} · единственный на всю игру</span></div>
+        <div class="dvSub">…</div>`;
+      el.classList.remove('hidden');
+      const sub = el.querySelector('.dvSub');
+      // барабаны: каждый символ таблички крутится, потом встаёт на место
+      const reels = [...el.querySelectorAll('.dvPlateBox .p-main i, .dvPlateBox .p-regnum i, .dvPlateBox .aeNum')];
+      // пока номер спускается — табличка пустая, символы появятся только из барабанов
+      reels.forEach(r => { r.dataset.c = r.textContent; r.textContent = ' '; r.classList.add('reel', 'blank'); });
+      const digits = '0123456789', letters = 'АВЕКМНОРСТУХ';
+      const spinIv = [], timers = [];
+      let finished = false, closed = false;
+      const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+      function startReels() {
+        sub.textContent = 'барабаны крутятся…';
+        reels.forEach(r => {
+          r.classList.remove('blank');
+          r.classList.add('spinning');
+          const pool = /\d/.test(r.dataset.c) ? digits : letters;
+          spinIv.push(setInterval(() => { r.textContent = pool[Math.floor(Math.random() * pool.length)]; }, 70));
+        });
+        const tickIv = setInterval(() => Snd.tick(), 110);
+        spinIv.push(tickIv);
+        reels.forEach((r, i) => at(1300 + i * 650, () => {
+          clearInterval(spinIv[i]);
+          r.textContent = r.dataset.c;
+          r.classList.remove('spinning');
+          r.classList.add('stopped');
+          Snd.suspense(i);
+          FX.burst(...centerOf(r), ['#ffe17d', '#ffffff'], 18, 0.6);
+        }));
+        at(1300 + reels.length * 650 + 300, finish);
+        if (!reels.length) at(2200, finish); // пустая табличка США — «пустота» просто вспыхивает
+      }
+      function centerOf(node) { const b = node.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; }
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        timers.forEach(clearTimeout);
+        spinIv.forEach(clearInterval);
+        reels.forEach(r => { r.textContent = r.dataset.c; r.classList.remove('spinning'); r.classList.add('stopped'); });
+        el.className = 'dvS1 dvS2 dvS3 dvDone';
+        sub.textContent = 'нажми, чтобы продолжить';
+        Snd.boom(); Snd.jingle('secret');
+        const [cx, cy] = centerOf(el.querySelector('.dvPlateBox'));
+        FX.flash('#ffffff'); FX.ring(cx, cy, '#ffd54a', 760); setTimeout(() => FX.ring(cx, cy, '#ffffff', 560), 200);
+        FX.coins(220); FX.coins(60, cx, cy);
+        timers.push(setTimeout(close, 9000));
+      }
+      function close() {
+        if (closed) return;
+        closed = true;
+        timers.forEach(clearTimeout);
+        spinIv.forEach(clearInterval);
+        el.classList.add('hidden');
+        el.onclick = null;
+        el.innerHTML = '';
+        resolve();
+      }
+      el.onclick = () => { if (!finished) finish(); else close(); };
+
+      // сценарий (медленно — ради такого момента можно подождать)
+      at(300, () => { el.classList.add('dvS1'); sub.textContent = 'что-то меняется…'; });          // экран светлеет
+      at(2600, () => { el.classList.add('dvS2'); sub.textContent = 'с небес спускается…'; Snd.suspense(0); }); // спуск
+      at(7400, () => { el.classList.add('dvS3'); FX.coins(30); startReels(); });                  // приземлился
     });
   }
 
   // --- оверлеи ---
+  // кто в Telegram: id аккаунта (null — игра открыта не в Telegram)
+  function tgUserId() {
+    const tg = window.Telegram && window.Telegram.WebApp;
+    return tg && tg.initData && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+  }
+  function devAllowed() {
+    const id = tgUserId();
+    return id === null || CFG.OWNER_TG_IDS.includes(id);
+  }
+
   function openOverlay(id) {
+    if (id === 'dev' && !devAllowed()) return;
     Snd.open();
     if (id === 'garage') renderGarage();
     if (id === 'shop') renderShop();
     if (id === 'settings') renderSettings();
-    if (id === 'regions') { State.get().mode === 'us' ? renderStates() : renderRegions(); $('regionsTitle').textContent = State.get().mode === 'us' ? '🗽 Выбор штата' : '📍 Выбор региона'; }
+    if (id === 'regions') {
+      const m = State.get().mode;
+      if (m === 'us') renderStates(); else if (m === 'ae') renderEmirates(); else if (m === 'mil') renderMilCodes(); else renderRegions();
+      $('regionsTitle').textContent = m === 'us' ? '🗽 Выбор штата' : m === 'ae' ? '🏙 Выбор эмирата' : m === 'mil' ? '🎖 Код войск' : '📍 Выбор региона';
+    }
+    if (id === 'types') renderTypes();
     if (id === 'profile') renderProfile();
     if (id === 'vips') renderVips();
     if (id === 'combos') renderCombos();
@@ -731,6 +1129,9 @@ const UI = (() => {
     if (id === 'modes') renderModes();
     if (id === 'exchange') renderExchange();
     if (id === 'dev') renderDev();
+    if (id === 'news') renderNews();
+    if (id === 'daily') renderDailyLogin();
+    if (id === 'prestige') renderPrestige();
     $(id).classList.remove('hidden');
   }
   function closeOverlay(id) { $(id).classList.add('hidden'); }
@@ -747,7 +1148,7 @@ const UI = (() => {
     const used = State.garageUsed(), cap = State.garageCap();
     let html = `<div class="gSummary">
       <span class="${used >= cap ? 'gFull' : ''}">🏠 мест: <b>${fmt(used)}/${fmt(cap)}</b></span>
-      <span>🔒 сейф: <b>${fmt(State.safeCount())}</b> <small>(легендарки+ место не занимают)</small></span>` +
+      <span>🔒 сейф: <b>${fmt(State.safeCount())}</b> <small>(мифики и секретки место не занимают)</small></span>` +
       CFG.RARITIES.map(r => `<span style="color:${r.color}">${r.name}: <b>${fmt(byR[r.key])}</b></span>`).join('') +
       `</div>
       <div class="gTools">
@@ -769,6 +1170,7 @@ const UI = (() => {
         <option value="civ">🚗 гражданские</option>
         <option value="mil">🪖 военные</option>
         <option value="us">🗽 США</option>
+        <option value="ae">🇦🇪 Эмираты</option>
       </select>
       <select id="gFilter">
         <option value="all">все редкости</option>` +
@@ -804,9 +1206,9 @@ const UI = (() => {
     return Object.keys(s.found).filter(p => !State.isUnique(p) && p !== s.showcase && CFG.TIER[s.found[p].r] <= gMassTier);
   }
   function sumByCur(plates) {
-    const sum = { rub: 0, usd: 0 };
+    const sum = { rub: 0, usd: 0, aed: 0 };
     for (const p of plates) sum[State.curOfPlate(p)] += State.sellValue(p);
-    return [sum.rub ? money(sum.rub, 'rub') : '', sum.usd ? money(sum.usd, 'usd') : ''].filter(Boolean).join(' + ') || '0 ₽';
+    return ['rub', 'usd', 'aed'].filter(c => sum[c]).map(c => money(sum[c], c)).join(' + ') || '0 ₽';
   }
   function massLabel() {
     const n = massTargets().length;
@@ -868,6 +1270,10 @@ const UI = (() => {
       const p = Plates.parse(plate), st = CFG.US_STATE[p.st];
       return (p.st + p.t + st.name.toUpperCase().replace(/\s/g, '')).includes(q);
     }
+    if (Plates.isAE(plate)) {
+      const p = Plates.parse(plate), e = CFG.AE_EM[p.em];
+      return (p.em + p.code + p.num + e.en.replace(/\s/g, '') + e.name.toUpperCase()).includes(q);
+    }
     return norm(plate).includes(norm(gQuery.trim()));
   }
 
@@ -876,7 +1282,7 @@ const UI = (() => {
     let list = Object.entries(s.found);
     list = list.filter(([p]) => matchQuery(p));
     if (gFilter !== 'all') list = list.filter(([, rec]) => rec.r === gFilter);
-    if (gType !== 'all') list = list.filter(([p]) => (Plates.isUS(p) ? 'us' : Plates.isMil(p) ? 'mil' : 'civ') === gType);
+    if (gType !== 'all') list = list.filter(([p]) => (Plates.isAE(p) ? 'ae' : Plates.isUS(p) ? 'us' : Plates.isMil(p) ? 'mil' : 'civ') === gType);
     const sorters = {
       new: (a, b) => b[1].t - a[1].t,
       old: (a, b) => a[1].t - b[1].t,
@@ -961,9 +1367,8 @@ const UI = (() => {
       Если выбран регион — падают только секретки этого региона. За все: +${fmt(CFG.SET_REWARDS.secrets)} ₽.</div>
       <div class="gSetGrid">`;
     for (const sp of CFG.SECRET_PLATES) {
-      html += scFound[sp.key]
-        ? `<div class="gSlot foundSlot">${plateHTML(scFound[sp.key], 'secret', 'blackPlate')}<div class="slotName">${sp.name}</div></div>`
-        : `<div class="gSlot">???<div class="slotName">${sp.reg === '*' ? 'любой регион' : 'регион ' + sp.reg}</div></div>`;
+      const ex = sp.plate + (sp.reg === '*' ? '77' : sp.reg); // пример для справочника
+      html += secretSlot(scFound[sp.key], ex, sp.name, sp.reg === '*' ? 'любой регион' : 'только регион ' + sp.reg, Plates.secretKeyOf(sp, 'civ'));
     }
     html += `</div>`;
 
@@ -986,11 +1391,32 @@ const UI = (() => {
         : `<div class="gSlot"><b>${y}</b><div class="slotName">${name}</div></div>`).join('') +
       `</div>`;
 
+    const msF = s.sets.milSecrets || {};
+    html += `<div class="gSetTitle">🎖 Военные секретки <small>${Object.keys(msF).length}/${CFG.MIL_SECRETS.length}</small></div>
+      <div class="gMeta">Точные военные номера-легенды. Шанс — как у гражданских секреток. Если выбран код войск — падают только секретки этого кода.</div>
+      <div class="gSetGrid">` +
+      CFG.MIL_SECRETS.map(sp => secretSlot(msF[sp.key], sp.plate + (sp.reg === '*' ? '10' : sp.reg), sp.name,
+        sp.reg === '*' ? 'любой код войск' : 'только код ' + sp.reg, Plates.secretKeyOf(sp, 'mil'))).join('') + `</div>`;
+
+    // --- божественные: четыре невозможных номера, по одному на страну ---
+    const dvF = s.sets.divine || {};
+    html += `<div class="gSetTitle">✨ Божественные <small>${Object.keys(dvF).length}/${CFG.DIVINE_PLATES.length}</small></div>
+      <div class="gMeta">Номера, которых не бывает. Каждый существует один раз на всю игру, шанс — 1 к ${fmt(Math.round(1 / CFG.DIVINE_CHANCE))} за крутку в своей стране.</div>
+      <div class="gSetGrid">` + CFG.DIVINE_PLATES.map(d => {
+        const got = dvF[d.key], taken = !got && State.isTaken('D:' + d.key);
+        return `<div class="gSlot secSlot ${got ? 'foundSlot' : 'secTodo'}">
+          ${got ? plateHTML('DV:' + d.key, 'divine') : '<div class="dvUnknown">???</div>'}
+          <div class="slotName"><b>${got ? d.name : '???'}</b></div>
+          <div class="slotName">${d.where}</div>
+          <div class="slotName secVal">${money(d.price, d.cur)}</div>
+          <div class="slotName">${got ? '✅ твой' : taken ? '💨 уже у кого-то' : '🔍 не найден'}</div></div>`;
+      }).join('') + `</div>`;
+
     // --- США ---
-    const rarOf = p => s.found[p] ? s.found[p].r : Plates.classify(p);
+    const rarOf = p => s.found[p] ? s.found[p].r : State.rarityOf(p);
     if (!s.us.visa) {
       html += `<div class="gSetTitle">🗽 США <small>закрыто</small></div>
-        <div class="gMeta">Купи визу в меню «Тип номеров», чтобы открыть американские коллекции.</div>`;
+        <div class="gMeta">Купи визу в меню «🌍 Страна», чтобы открыть американские коллекции.</div>`;
     } else {
       const stF = s.sets.states || {};
       html += `<div class="gSetTitle">🗽 Road trip: штаты <small>${Object.keys(stF).length}/${CFG.US_STATES.length}</small></div>
@@ -1010,11 +1436,40 @@ const UI = (() => {
       const usF = s.sets.usSecrets || {};
       html += `<div class="gSetTitle">🕶 Секретки США <small>${Object.keys(usF).length}/${CFG.US_SECRETS.length}</small></div>
         <div class="gSetGrid">` +
-        CFG.US_SECRETS.map(x => usF[x.key]
-          ? `<div class="gSlot foundSlot">${plateHTML(usF[x.key], 'secret', 'blackPlate')}<div class="slotName">${x.name}</div></div>`
-          : `<div class="gSlot">???<div class="slotName">${x.st === '*' ? 'любой штат' : CFG.US_STATE[x.st].name}</div></div>`).join('') + `</div>`;
+        CFG.US_SECRETS.map(x => secretSlot(usF[x.key], 'US:' + (x.st === '*' ? 'CA' : x.st) + ':' + x.t, x.name,
+          x.st === '*' ? 'любой штат' : 'только ' + CFG.US_STATE[x.st].name, Plates.secretKeyOf(x, 'us'))).join('') + `</div>`;
     }
+    // --- Эмираты ---
+    if (!s.ae.visa) {
+      html += `<div class="gSetTitle">🇦🇪 Эмираты <small>закрыто</small></div>
+        <div class="gMeta">Купи визу в меню «🌍 Страна», чтобы открыть коллекции Эмиратов.</div>`;
+    } else {
+      const emF = s.sets.emirates || {};
+      html += `<div class="gSetTitle">🏜 Все эмираты <small>${Object.keys(emF).length}/${CFG.AE_EMIRATES.length}</small></div>
+        <div class="gMeta">Оставь в гараже хотя бы один номер каждого из семи эмиратов.</div><div class="gSetGrid">` +
+        CFG.AE_EMIRATES.map(e => emF[e.em]
+          ? `<div class="gSlot foundSlot">${plateHTML(emF[e.em], rarOf(emF[e.em]))}<div class="slotName">${e.name}</div></div>`
+          : `<div class="gSlot"><b>${e.em}</b><div class="slotName">${e.name}</div></div>`).join('') + '</div>';
+    }
+    const aeF = s.sets.aeSecrets || {};
+    html += `<div class="gSetTitle">🕶 Секретки Эмиратов <small>${Object.keys(aeF).length}/${CFG.AE_SECRETS.length}</small></div>
+      <div class="gMeta">Самые дорогие номера в игре — реальные легенды аукционов Дубая и Абу-Даби.</div><div class="gSetGrid">` +
+      CFG.AE_SECRETS.map(x => secretSlot(aeF[x.key], Plates.aePlate(x.em === '*' ? 'DXB' : x.em, x.code, x.num), x.name,
+        x.em === '*' ? 'любой эмират' : 'только ' + CFG.AE_EM[x.em].name, Plates.secretKeyOf(x, 'ae'))).join('') + '</div>';
     $('collBody').innerHTML = html;
+  }
+
+  // справочник секреток: все видны сразу — номер, имя, где падает и сколько стоит
+  function secretSlot(foundPlate, example, name, where, key) {
+    const shown = foundPlate || example;
+    const onMarket = !foundPlate && State.isTaken(key);
+    const status = foundPlate ? '✅ найдена' : onMarket ? '🛍 сейчас на рынке' : '🔍 не найдена';
+    return `<div class="gSlot secSlot ${foundPlate ? 'foundSlot' : 'secTodo'}">
+      ${plateHTML(shown, foundPlate ? State.rarityOf(foundPlate) : 'secret', 'blackPlate')}
+      <div class="slotName"><b>${name}</b></div>
+      <div class="slotName">${where}</div>
+      <div class="slotName secVal">≈ ${money(State.sellValue(shown), shown)}${where.startsWith('любой') ? ' и выше' : ''}</div>
+      <div class="slotName">${status}</div></div>`;
   }
 
   // --- магазин ---
@@ -1037,7 +1492,30 @@ const UI = (() => {
         </button>
       </div>`;
     }
+    html += `<div class="gSetTitle">🎨 Скины табличек <small>только красота, на цену не влияют</small></div>
+      <div class="skinGrid">` +
+      [{ key: null, name: 'Обычная', desc: 'Как с завода', cost: 0 }, ...CFG.SKINS].map(sk => {
+        const own = !sk.key || s.skins.owned[sk.key];
+        const on = (s.skins.on || null) === sk.key;
+        return `<div class="skinCard ${on ? 'skinOn' : ''}" data-skinwrap="${sk.key || ''}">
+          <div class="skinPreview" data-skin="${sk.key || ''}">${plateHTML('А777АА77', 'rare')}</div>
+          <b>${sk.name}</b><small>${sk.desc}</small>
+          <button class="upBtn" data-skin-act="${sk.key || ''}" ${!own && s.money < sk.cost ? 'disabled' : ''}>
+            ${on ? 'Надето ✓' : own ? 'Надеть' : fmt(sk.cost) + ' ₽'}</button>
+        </div>`;
+      }).join('') + '</div>';
     $('shopBody').innerHTML = html;
+    $('shopBody').querySelectorAll('[data-skin-act]').forEach(btn => {
+      btn.onclick = () => {
+        const key = btn.dataset.skinAct || null;
+        const s2 = State.get();
+        if (key && !s2.skins.owned[key]) {
+          if (!State.buySkin(key)) { Snd.deny(); toast('Не хватает денег на скин'); return; }
+          Snd.buy(); FX.rain(['#a78bfa', '#ffffff', '#38bdf8'], 50); toast('🎨 Скин куплен и надет!');
+        } else { State.setSkin(key); Snd.click(); toast(key ? '🎨 Скин надет' : 'Табличка снова обычная'); }
+        renderShop(); refreshHUD();
+      };
+    });
     $('shopBody').querySelectorAll('[data-up]').forEach(btn => {
       btn.onclick = () => {
         if (State.buyUpgrade(btn.dataset.up)) {
@@ -1052,6 +1530,75 @@ const UI = (() => {
   }
 
   // --- настройки ---
+  // --- перерождение ---
+  function renderPrestige() {
+    const s = State.get();
+    const need = State.prestigeNeed(), can = State.canPrestige();
+    const pct = Math.min(100, Math.floor(s.money / need * 100));
+    const now = Math.round(CFG.PRESTIGE.BONUS * 100 * (s.prestige || 0)), next = now + Math.round(CFG.PRESTIGE.BONUS * 100);
+    $('prestigeBody').innerHTML = `
+      <div class="prTop"><div class="prStar">${'⭐'.repeat(Math.max(1, Math.min(5, s.prestige || 0)))}</div>
+        <b>Перерождений: ${s.prestige || 0}</b><small>бонус ко всем продажам сейчас: +${now}%</small></div>
+      <div class="gMeta">Упёрся в потолок? Начни заново сильнее: каждое перерождение навсегда добавляет +${Math.round(CFG.PRESTIGE.BONUS * 100)}% к цене любой продажи.</div>
+      <div class="prCols">
+        <div class="prCol prBurn"><b>🔥 Сгорит</b><span>рубли и доллары</span><span>обычные номера гаража (до легендарок включительно)</span><span>апгрейды магазина</span><span>объявления на рынке</span></div>
+        <div class="prCol prKeep"><b>🛡 Останется</b><span>сейф: мифики, секретки, божественные</span><span>коллекции и достижения</span><span>уровень и билеты</span><span>визы, скины, рекорды, рейтинг рынка</span></div>
+      </div>
+      <div class="gMeta">Нужно накопить: <b>${money(need, 'rub')}</b> · у тебя ${money(s.money, 'rub')}</div>
+      <span class="achBar prBar"><i style="width:${pct}%"></i></span>
+      <button class="dangerBtn prBtn" id="prGo" ${can ? '' : 'disabled'}>${can ? `🔁 Переродиться (+${next}% к продажам)` : `Накоплено ${pct}%`}</button>`;
+    let armed = false;
+    if (can) $('prGo').onclick = e => {
+      if (!armed) { armed = true; e.target.textContent = 'ТОЧНО? Деньги, обычные номера и апгрейды сгорят'; return; }
+      if (!State.doPrestige()) return;
+      closeOverlay('prestige');
+      Snd.jingle('secret');
+      FX.flash('#ffe17d');
+      FX.rain(['#ffe17d', '#ffffff', '#a78bfa'], 220);
+      hideResult();
+      showPlate(placeholder(), 'common');
+      $('feed').innerHTML = '';
+      showEvents(State.checkNow());
+      refreshHUD();
+    };
+  }
+
+  // --- бонус за вход: 7 клеток, сегодняшняя подсвечена ---
+  function renderDailyLogin() {
+    const s = State.get();
+    const today = State.loginDay();
+    const can = !s.login.claimed;
+    const label = r => [r.money ? money(r.money, 'rub') : '', r.tickets ? '🎟 ×' + r.tickets : '', r.charge ? '⚡ заряд ' + r.charge + '×' : '']
+      .filter(Boolean).join('<br>');
+    $('dailyBody').innerHTML = `<div class="gMeta">Заходи каждый день подряд — награда растёт. Пропустил день — серия с начала.
+      Серия сейчас: <b>${s.login.streak}</b> ${s.login.streak === 1 ? 'день' : 'дн.'}</div>
+      <div class="loginGrid">` + CFG.LOGIN.DAYS.map((d, i) => {
+        const st = i < today ? 'got' : i === today ? (can ? 'now' : 'got') : 'later';
+        return `<div class="loginDay ld-${st} ${i === 6 ? 'ldBig' : ''}"><b>День ${i + 1}</b><span>${label(State.loginReward(i))}</span>
+          ${st === 'got' ? '<i>✓</i>' : ''}</div>`;
+      }).join('') + `</div>
+      <button class="gSell loginBtn" id="loginClaim" ${can ? '' : 'disabled'}>${can ? 'Забрать награду 🎁' : 'Сегодня уже забрано — приходи завтра'}</button>`;
+    if (can) $('loginClaim').onclick = () => {
+      const r = State.claimLogin();
+      if (!r) return;
+      Snd.reward();
+      FX.rain(['#ffe17d', '#4ade80', '#ffffff'], 90);
+      toast(`🎁 Бонус за вход: ${[r.money ? '+' + money(r.money, 'rub') : '', r.tickets ? '🎟 +' + r.tickets : '', r.charge ? '⚡ следующая крутка — лучший из ' + r.charge : ''].filter(Boolean).join(' · ')}`);
+      refreshHUD();
+      renderDailyLogin();
+      setTimeout(() => closeOverlay('daily'), 900);
+    };
+  }
+
+  // «Что нового»: последние обновления
+  function renderNews() {
+    $('newsBody').innerHTML = CFG.CHANGELOG.map((c, i) => `<div class="newsBlock ${i ? 'old' : ''}">
+      <div class="newsHead"><b>${c.title}</b><span>v${c.v}</span></div>
+      <ul>${c.items.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('') +
+      '<button class="gSell newsOk">Погнали! 🚘</button>';
+    $('newsBody').querySelector('.newsOk').onclick = () => closeOverlay('news');
+  }
+
   function renderSettings() {
     const st = State.get().settings;
     $('settingsBody').innerHTML = `
@@ -1081,7 +1628,10 @@ const UI = (() => {
         <button class="gStar" id="setImport">📥 Загрузить вставленный сейв</button>
       </div>
       <button class="dangerBtn" id="setReset">Сбросить весь прогресс</button>
+      ${tgUserId() !== null ? `<div class="setVer">Твой Telegram ID: <b>${tgUserId()}</b></div>` : ''}
+      <div class="setVer">Блатной Номерок v${CFG.VERSION} · <a href="#" id="setNews">что нового</a></div>
     `;
+    $('setNews').onclick = e => { e.preventDefault(); closeOverlay('settings'); openOverlay('news'); };
     $('setExport').onclick = async () => {
       const txt = State.exportSave();
       let ok = false;
@@ -1151,10 +1701,13 @@ const UI = (() => {
     $('vipBtn').onclick = () => openOverlay('vips');
     bindMenu('btnShop', 'shop');
     bindMenu('btnSettings', 'settings');
+    bindMenu('btnPrestige', 'prestige');
+    bindMenu('btnDaily', 'daily');
     bindMenu('btnExchange', 'exchange');
-    bindMenu('btnDev', 'dev');
+    if (devAllowed()) bindMenu('btnDev', 'dev'); else $('btnDev').remove();
     $('bragBtn').onclick = () => brag();
     $('modeBtn').onclick = () => openOverlay('modes');
+    $('typeBtn').onclick = () => openOverlay('types');
     document.querySelectorAll('.closeBtn').forEach(b => b.onclick = () => closeOverlay(b.dataset.close));
     document.querySelectorAll('.overlay').forEach(ov => {
       ov.addEventListener('click', e => { if (e.target === ov) ov.classList.add('hidden'); });
@@ -1194,7 +1747,7 @@ const UI = (() => {
     const R = s.rec;
     const recRow = (icon, label, r) => `<div class="recRow"><span class="recIcon">${icon}</span>
       <span class="recLabel">${label}</span>
-      ${r ? `${plateHTML(r.p, Plates.classify(r.p))}<b class="recVal">${fmt(r.v)} ₽</b>` : '<span class="gMeta">пока нет</span>'}</div>`;
+      ${r ? `${plateHTML(r.p, State.rarityOf(r.p))}<b class="recVal">${fmt(r.v)} ₽</b>` : '<span class="gMeta">пока нет</span>'}</div>`;
     html += `<div class="gSetTitle">📔 Книга рекордов</div>` +
       recRow('💰', 'Самая дорогая продажа', R.maxSale) +
       recRow('📱', 'Самая дорогая сделка на рынке', R.maxMarket) +
@@ -1236,18 +1789,47 @@ const UI = (() => {
         }).join('')
       : '<div class="gMeta">пока пусто — лови легендарку!</div>';
 
-    const done = CFG.ACHIEVEMENTS.filter(a => s.claimed['a' + a.id]).length;
-    html += `<div class="gSetTitle">🏅 Достижения <small>${done}/${CFG.ACHIEVEMENTS.length}</small></div>`;
-    html += CFG.ACHIEVEMENTS.map(a => {
-      const ok = s.claimed['a' + a.id];
-      return `<div class="achRow ${ok ? 'achDone' : ''}">
-        <span class="achIcon">${ok ? '🏅' : '🔒'}</span>
-        <span class="achInfo"><b>${a.name}</b><small>${a.desc}</small></span>
-        <span class="achReward">+${fmt(a.reward)} ₽</span>
-      </div>`;
-    }).join('');
+    html += achievementsHTML(s);
 
     $('profileBody').innerHTML = html;
+    $('profileBody').querySelectorAll('[data-achtab]').forEach(b => {
+      b.onclick = () => { achTab = b.dataset.achtab; Snd.click(); renderProfile(); };
+    });
+  }
+
+  // --- достижения: вкладки по категориям, уровни I–V с прогрессом, секретные — «???» ---
+  let achTab = 'spins';
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+  const short = n => n >= 1e9 ? (n / 1e9) + ' млрд' : n >= 1e6 ? (n / 1e6) + ' млн' : fmt(n);
+  function achievementsHTML(s) {
+    let tiersDone = 0, tiersAll = 0;
+    for (const a of CFG.ACH) a.goals.forEach((g, i) => { tiersAll++; if (s.claimed[State.achKey(a, i)]) tiersDone++; });
+    let h = `<div class="gSetTitle">🏅 Достижения <small>${tiersDone}/${tiersAll} · очков: ${fmt(State.achPoints())}</small></div>
+      <div class="tabRow achTabs">` + CFG.ACH_CATS.map(c => {
+        const list = CFG.ACH.filter(a => a.cat === c.key);
+        const left = list.some(a => a.goals.some((g, i) => !s.claimed[State.achKey(a, i)] && a.prog(s) >= g));
+        return `<button class="tabBtn ${achTab === c.key ? 'tabOn' : ''}" data-achtab="${c.key}">${c.name}${left ? ' •' : ''}</button>`;
+      }).join('') + '</div>';
+    for (const a of CFG.ACH.filter(x => x.cat === achTab)) {
+      const p = a.prog(s);
+      const lvl = a.goals.filter((g, i) => s.claimed[State.achKey(a, i)]).length;
+      const maxed = lvl >= a.goals.length;
+      const hidden = a.secret && !maxed;
+      const goal = a.goals[Math.min(lvl, a.goals.length - 1)];
+      const r = State.achReward(a, Math.min(lvl, a.goals.length - 1));
+      const pct = maxed ? 100 : Math.min(100, Math.floor(p / goal * 100));
+      const multi = a.goals.length > 1;
+      h += `<div class="achRow ${maxed ? 'achDone' : ''}">
+        <span class="achIcon">${hidden ? '❓' : a.icon}</span>
+        <span class="achInfo">
+          <b>${hidden ? '???' : a.name}${multi ? ` <span class="achTier">${a.goals.map((g, i) => '<i class="' + (i < lvl ? 'on' : '') + '">★</i>').join('')}</span>` : ''}</b>
+          <small>${hidden ? 'подсказка: ' + a.hint : a.desc.replace('{n}', short(goal))}</small>
+          ${multi && !maxed ? `<span class="achBar"><i style="width:${pct}%"></i></span><small>${short(Math.min(p, goal))} / ${short(goal)} · уровень ${ROMAN[lvl]}</small>` : ''}
+        </span>
+        <span class="achReward">${maxed ? '✅' : `+${fmt(r.money)} ₽${r.tickets ? `<br>🎟 +${r.tickets}` : ''}`}</span>
+      </div>`;
+    }
+    return h;
   }
 
   // --- облава: баннер с таймером и полицейская подсветка ---
@@ -1329,7 +1911,30 @@ const UI = (() => {
     // табличка (военные — всегда чёрные)
     const black = tier >= CFG.TIER.mythic || p.mil;
     const px = 150, py = 150, pw = 580, ph = 130, regW = 150;
-    if (p.us) { // США: цвета штата, название сверху, прозвище снизу
+    if (p.dv) { // божественный: золотая табличка с «невозможным» текстом
+      const dvp = Plates.divineOf(plate);
+      const gg = cx.createLinearGradient(px, py, px + pw, py + ph);
+      gg.addColorStop(0, '#7a5410'); gg.addColorStop(0.3, '#f5d26b'); gg.addColorStop(0.5, '#fff3c4'); gg.addColorStop(0.7, '#d9a82e'); gg.addColorStop(1, '#8a6214');
+      cx.fillStyle = gg; roundRect(cx, px, py, pw, ph, 14); cx.fill();
+      cx.lineWidth = 5; cx.strokeStyle = '#5c3d06'; cx.stroke();
+      cx.textAlign = 'center'; cx.fillStyle = '#3a2603'; cx.font = '800 72px Arial Narrow, Segoe UI, sans-serif';
+      cx.fillText(dvp.key === 'us' ? 'CALIFORNIA' : dvp.show, W / 2, py + 92);
+    }
+    else if (p.ae) { // Эмираты: эмират и код слева, крупные цифры справа
+      const e = CFG.AE_EM[p.em];
+      const ink = black ? '#eef1f4' : '#111';
+      cx.fillStyle = black ? '#0b0d12' : '#fbfbfa';
+      roundRect(cx, px, py, pw, ph, 10); cx.fill();
+      cx.lineWidth = 6; cx.strokeStyle = black ? '#3a3f47' : '#111'; cx.stroke();
+      cx.beginPath(); cx.moveTo(px + 140, py + 10); cx.lineTo(px + 140, py + ph - 10); cx.stroke();
+      cx.textAlign = 'center'; cx.fillStyle = ink;
+      cx.font = '900 20px Arial Narrow, Segoe UI, sans-serif'; cx.fillText(e.en.length > 9 ? e.en.split(' ')[0] : e.en, px + 70, py + 56);
+      cx.font = '700 26px Segoe UI, sans-serif'; cx.fillText(e.ar, px + 70, py + 92);
+      if (black) { cx.shadowColor = rc.color; cx.shadowBlur = 16; }
+      cx.font = '800 96px Arial Narrow, Segoe UI, sans-serif'; cx.fillText((p.code ? p.code + '  ' : '') + p.num, px + 140 + (pw - 140) / 2, py + 100);
+      cx.shadowBlur = 0;
+    }
+    else if (p.us) { // США: цвета штата, название сверху, прозвище снизу
       const st = CFG.US_STATE[p.st];
       cx.fillStyle = black ? '#0b0d12' : st.bg;
       roundRect(cx, px, py, pw, ph, 14); cx.fill();
@@ -1397,6 +2002,12 @@ const UI = (() => {
   }
 
   // --- меню разработчика (кнопка в ☰ или клавиша ` / Ё) ---
+  // сколько секреток текущей страны ещё никем не найдено
+  function secretsLeft() {
+    const s = State.get();
+    const list = s.mode === 'us' ? CFG.US_SECRETS : s.mode === 'ae' ? CFG.AE_SECRETS : s.mode === 'mil' ? CFG.MIL_SECRETS : CFG.SECRET_PLATES;
+    return list.filter(x => !State.isTaken(Plates.secretKeyOf(x, s.mode))).length;
+  }
   function renderDev() {
     const s = State.get();
     const N = window.__nom;
@@ -1406,7 +2017,7 @@ const UI = (() => {
     $('devBody').innerHTML = `
       <div class="devSec">💰 Деньги <small>₽ ${fmt(s.money)} · $${fmt(s.us.usd)}</small></div>
       <div class="devRow">${btn('rub:1000000', '+1 млн ₽')}${btn('rub:10000000', '+10 млн ₽')}${btn('rub:100000000', '+100 млн ₽')}
-        ${btn('usd:10000', '+$10 000')}${btn('usd:1000000', '+$1 млн')}</div>
+        ${btn('usd:10000', '+$10 000')}${btn('usd:1000000', '+$1 млн')}${btn('aed:100000', '+100 000 AED')}${btn('aed:10000000', '+10 млн AED')}</div>
       <div class="devRow"><input type="number" id="devAmt" placeholder="своя сумма">
         ${btn('rubAmt', '→ в ₽')}${btn('usdAmt', '→ в $')}${btn('zero', 'Обнулить оба')}</div>
 
@@ -1427,7 +2038,7 @@ const UI = (() => {
 
       <div class="devSec">⭐ Прогресс</div>
       <div class="devRow">${btn('lvl:1', 'Уровень +1')}${btn('lvl:5', 'Уровень +5')}${btn('tick:5', 'Билеты заряда +5')}
-        ${btn('maxup', 'Все апгрейды на максимум')}${btn('visa', s.us.visa ? 'Забрать визу США' : 'Выдать визу США')}</div>
+        ${btn('maxup', 'Все апгрейды на максимум')}${btn('visa', s.us.visa ? 'Забрать визу США' : 'Выдать визу США')}${btn('visaAe', s.ae.visa ? 'Забрать визу Эмиратов' : 'Выдать визу Эмиратов')}</div>
       <div class="gMeta">Меню для тестов: открывается в ☰ или клавишей <b>\`</b> (Ё). Всё выданное сохраняется в сейв.</div>`;
     $('devBody').querySelectorAll('[data-act]').forEach(b => {
       b.onclick = () => {
@@ -1436,11 +2047,17 @@ const UI = (() => {
         const amt = Math.max(0, Math.floor(Number($('devAmt').value) || 0));
         if (act === 'rub') N.give(n);
         else if (act === 'usd') N.giveUsd(n);
+        else if (act === 'aed') { s.ae.aed += n; }
         else if (act === 'rubAmt') N.give(amt);
         else if (act === 'usdAmt') N.giveUsd(amt);
         else if (act === 'zero') { s.money = 0; s.us.usd = 0; }
         else if (act === 'luck') { N.setDevLuck(n); toast(n === 1 ? '🍀 Удача: обычная' : `🍀 Удача ×${n} на все крутки`); }
-        else if (act === 'force') { N.forceRarity(arg); toast(`🎯 Следующая крутка: ${CFG.RARITIES[CFG.TIER[arg]].name}`); }
+        else if (act === 'force') {
+          N.forceRarity(arg);
+          const left = secretsLeft();
+          toast(arg === 'secret' && !left ? '🎯 Все секретки этой страны уже найдены — выпадет мифик'
+            : `🎯 Следующая крутка: ${CFG.RARITIES[CFG.TIER[arg]].name}` + (arg === 'secret' ? ` (осталось секреток: ${left})` : ''));
+        }
         else if (act === 'next') { N.setNextTries(n); toast(`⚡ Следующая крутка — лучший из ${n}`); }
         else if (act === 'raid') { closeOverlay('dev'); N.raidNow(); }
         else if (act === 'market') { closeOverlay('dev'); Market.devBuyerNow(); }
@@ -1452,6 +2069,11 @@ const UI = (() => {
         else if (act === 'lvl') { s.level += n; s.xp = 0; toast(`Уровень ${s.level}`); }
         else if (act === 'tick') { s.tickets += n; }
         else if (act === 'maxup') { for (const k in CFG.UPGRADES) s.up[k] = CFG.UPGRADES[k].costs.length; toast('Все апгрейды на максимуме'); }
+        else if (act === 'visaAe') {
+          if (s.ae.visa) { s.ae.visa = false; if (s.mode === 'ae') { State.setMode('civ'); showPlate(placeholder(), 'common'); } }
+          else { s.ae.visa = true; }
+          toast(s.ae.visa ? '🇦🇪 Виза Эмиратов выдана' : 'Виза Эмиратов забрана');
+        }
         else if (act === 'visa') {
           if (s.us.visa) { s.us.visa = false; if (s.mode === 'us') { State.setMode('civ'); showPlate(placeholder(), 'common'); } }
           else { s.us.visa = true; }
@@ -1465,7 +2087,7 @@ const UI = (() => {
     });
   }
 
-  return { init, plateHTML, showPlate, animateSpin, showResult, showChoice, hideChoice, markChoiceDone, feedPush,
+  return { init, coinsToWallet, plateHTML, showPlate, animateSpin, showResult, showChoice, hideChoice, markChoiceDone, feedPush,
     refreshHUD, toast, showEvents, bigMoment, darkReveal, openOverlay, closeOverlay,
     getVipSel, setVipSel, setRaid, levelUp, brag, money, plateText };
 })();

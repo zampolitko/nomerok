@@ -13,6 +13,8 @@ const Market = (() => {
       'Олег Тюнинг', 'Мага', 'Серёга', 'Вован', 'Настя', 'Гоша Автосалон', 'Тимур', 'Михалыч'],
     usd: ['Bob from Texas', 'Tony Casino', 'Trucker Mike', 'Collector Dave', 'Jessica', 'Kevin', 'Car dealer Rick',
       'Lil Plate', 'Grandma Sue', 'Hank'],
+    aed: ['Sheikh Rashid', 'Ahmed', 'Khalid', 'Omar from Marina', 'Faisal', 'Yousef', 'Hamdan', 'Rich Expat Tom',
+      'Saeed', 'Mansour', 'Layla', 'Abdullah'],
   };
   const AVA = ['😎', '🧔', '👨‍🦲', '👩', '🤠', '👴', '🧑‍💼', '👨‍🔧', '🕶', '🐻', '🦊', '🐺'];
   // тексты: {p} — цена объявления, {o} — предложение, {c} — встречная игрока
@@ -54,10 +56,11 @@ const Market = (() => {
       gone: 'Listing removed',
     },
   };
+  T.aed = T.usd; // в Эмиратах торгуются по-английски
   const fill = (t, o) => t.replace('{p}', o.p || '').replace('{o}', o.o || '').replace('{c}', o.c || '');
 
   // --- чистые расчёты ---
-  function curOf(plate) { return P.isUS(plate) ? 'usd' : 'rub'; }
+  function curOf(plate) { const dv = P.divineOf(plate); if (dv) return dv.cur; return P.isAE(plate) ? 'aed' : P.isUS(plate) ? 'usd' : 'rub'; }
   // «интересный» номер — коллекционеры пишут чаще и платят больше
   function interesting(plate) {
     if (P.tierOf(plate) >= C.TIER.epic) return true;
@@ -75,7 +78,7 @@ const Market = (() => {
     return Math.round(Math.max(M.MIN_WAIT_MS, Math.min(M.MAX_WAIT_MS, ms)));
   }
   function niceRound(v, cur) {
-    if (cur === 'usd') {
+    if (cur === 'usd' || cur === 'aed') {
       if (v >= 100000) return Math.round(v / 1000) * 1000;
       if (v >= 10000) return Math.round(v / 100) * 100;
       return v >= 100 ? Math.round(v / 5) * 5 : Math.max(1, Math.round(v));
@@ -115,7 +118,7 @@ const Market = (() => {
 
   // --- работа с состоянием (только в браузере) ---
   const S = () => State.get().market;
-  const money = (v, cur) => cur === 'usd' ? '$' + v.toLocaleString('ru-RU') : v.toLocaleString('ru-RU') + ' ₽';
+  const money = (v, cur) => cur === 'usd' ? '$' + v.toLocaleString('ru-RU') : cur === 'aed' ? v.toLocaleString('ru-RU') + ' AED' : v.toLocaleString('ru-RU') + ' ₽';
   function est(plate) { return niceRound(State.sellValue(plate) * M.EST_MULT, curOf(plate)); }
   function slots() { return M.BASE_SLOTS + (State.get().up.slots || 0); }
   function active() { return S().listings.filter(l => !l.sold); }
@@ -272,7 +275,7 @@ const Market = (() => {
     const c = S().chats.find(x => x.id === cid);
     if (!c || (c.status !== 'open' && c.status !== 'firm')) return;
     if (c.kind === 'buy') { // покупка: игрок передумал
-      addMsg(c, 'me', c.cur === 'usd' ? 'Changed my mind, sorry' : 'Передумал, извините');
+      addMsg(c, 'me', c.cur !== 'rub' ? 'Changed my mind, sorry' : 'Передумал, извините');
       c.status = 'gone'; c.unread = false; c.reply = null;
       State.markDirty();
       return;
@@ -284,7 +287,7 @@ const Market = (() => {
       if (c.cur === 'rub' && (!s.rec.maxLowball || ratio < s.rec.maxLowball.r))
         s.rec.maxLowball = { p: c.plate, v: c.offer, r: ratio, t: Date.now() };
     }
-    addMsg(c, 'me', 'Нет, не интересно');
+    addMsg(c, 'me', c.cur !== 'rub' ? 'No thanks, not interested' : 'Нет, не интересно');
     addMsg(c, 'buyer', pick(T[c.cur].decline));
     c.status = 'gone';
     c.unread = false;
@@ -296,8 +299,8 @@ const Market = (() => {
     if (!c || c.status !== 'open' || c.reply || v <= 0) return false;
     if (c.kind === 'buy' && v >= c.offer) return false; // не меньше цены — просто покупай
     addMsg(c, 'me', c.kind === 'buy'
-      ? (c.cur === 'usd' ? `Would you take ${money(v, c.cur)}?` : `Отдадите за ${money(v, c.cur)}?`)
-      : `Давайте за ${money(v, c.cur)}`);
+      ? (c.cur !== 'rub' ? `Would you take ${money(v, c.cur)}?` : `Отдадите за ${money(v, c.cur)}?`)
+      : (c.cur !== 'rub' ? `How about ${money(v, c.cur)}?` : `Давайте за ${money(v, c.cur)}`));
     c.reply = { counter: v };
     c.replyAt = Date.now() + rnd(M.REPLY_MS[0], M.REPLY_MS[1]);
     State.markDirty();
@@ -317,7 +320,7 @@ const Market = (() => {
 
   // ================= ПОКУПКА: чужие объявления =================
   const B = M.BUY;
-  const ST = { // реплики продавцов: {c} — цена игрока, {o} — встречная продавца, {p} — окончательная
+  const ST = { // реплики продавцов (aed — те же английские, что и usd): {c} — цена игрока, {o} — встречная продавца, {p} — окончательная
     rub: {
       hi: ['Здравствуйте, номер на месте', 'Привет, да, продаю', 'Добрый день, номер в наличии'],
       agree: ['Ладно, забирай за {c}', 'Договорились, {c}', 'Эх, уговорил — {c}'],
@@ -349,6 +352,11 @@ const Market = (() => {
   // номера, которых не хватает в наборах игрока — на рынке их больше
   function wantedMakers(cur) {
     const s = State.get(), sets = s.sets, out = [];
+    if (cur === 'aed') {
+      const ems = C.AE_EMIRATES.filter(x => !sets.emirates[x.em]);
+      if (ems.length) out.push(() => P.randomPlate(Math.random, pick(ems).em, 'ae')); // номер недостающего эмирата
+      return out;
+    }
     if (cur === 'usd') {
       const st = C.US_STATES.filter(x => !sets.states[x.st]);
       if (st.length) out.push(() => P.randomPlate(Math.random, pick(st).st, 'us')); // любой номер недостающего штата
@@ -359,7 +367,7 @@ const Market = (() => {
     const words = C.WORDS.filter(w => !sets.words[w]);
     if (words.length) out.push(() => { const w = pick(words); return w[0] + rDig() + w[1] + w[2] + P.rollRegion(Math.random); });
     const dates = Object.keys(C.MIL_DATES).filter(d => !(sets.dates || {})[d]);
-    if (dates.length) out.push(() => pick(dates) + rLet() + rLet() + pick(C.MIL.CODES));
+    if (dates.length) out.push(() => pick(dates) + rLet() + rLet() + P.rollMilCode(Math.random));
     return out;
   }
   // что этот номер закрывает в коллекциях (подпись на карточке)
@@ -367,6 +375,7 @@ const Market = (() => {
     const s = State.get(), sets = s.sets;
     const sec = P.secretOf(plate);
     if (sec) return `🤫 секретка «${sec.name}»`;
+    if (P.isAE(plate)) return sets.emirates[P.parse(plate).em] ? '' : '🧩 нового эмирата нет в коллекции';
     if (P.isUS(plate)) {
       const p = P.parse(plate);
       if (p.van && !sets.vanity[p.t]) return '🧩 нет в наборе именных';
@@ -384,18 +393,24 @@ const Market = (() => {
   // сгенерировать объявление. forceKey — тест/дев: secret|mythic|legendary|epic|wanted|filler
   function genOffer(cur, forceKey) {
     const s = State.get();
-    const us = cur === 'usd';
+    const us = cur === 'usd', ae = cur === 'aed';
     const busy = new Set([...SH().offers.map(o => o.plate), ...active().map(l => l.plate)]);
     const free = p => {
       if (!p || s.found[p] || busy.has(p)) return false;
       const k = P.uniqKey(p);
       return !k || !State.isTaken(k);
     };
-    const mode = () => us ? 'us' : (Math.random() < B.MIL_SHARE ? 'mil' : 'civ');
+    const mode = () => ae ? 'ae' : us ? 'us' : (Math.random() < B.MIL_SHARE ? 'mil' : 'civ');
     const tryMake = make => { for (let i = 0; i < 40; i++) { const p = make(); if (free(p)) return p; } return null; };
     const makers = {
-      secret: () => P.craft('secret', Math.random, null, us ? 'us' : 'civ'),
-      mythic: () => (!us && Math.random() < 0.4) ? pick(C.MYTHICS).plate : P.craft('mythic', Math.random, null, mode()),
+      secret: () => P.craft('secret', Math.random, null, mode()),
+      // именные легенды — только те, что по сочетаниям действительно мифики
+      mythic: () => {
+        const named = C.MYTHICS.filter(m => P.classify(m.plate) === 'mythic');
+        if (!us && !ae && named.length && Math.random() < 0.4) return pick(named).plate;
+        const p = P.craft('mythic', Math.random, null, mode());
+        return P.classify(p) === 'mythic' ? p : null;
+      },
       legendary: () => P.craft('legendary', Math.random, null, mode()),
       epic: () => P.craft('epic', Math.random, null, mode()),
       wanted: () => { const w = wantedMakers(cur); return w.length ? pick(w)() : null; },
@@ -406,18 +421,20 @@ const Market = (() => {
     let plate = null;
     for (let i = chain.indexOf(key); i < chain.length && !plate; i++) plate = tryMake(makers[chain[i]]);
     if (!plate) return null;
-    if (P.isUS(plate) !== us) return null;
+    if (curOf(plate) !== cur) return null;
     const r = P.classify(plate);
     const e = est(plate);
     const unique = !!P.uniqKey(plate);
     let kind, k;
     if (unique) { kind = 'unique'; k = rnd(...B.UNIQUE_K[r] || B.UNIQUE_K.legendary); }
     else { kind = rollW(B.KIND); k = rnd(...B.PRICE[kind]); }
-    const price = niceRound(Math.max(e * B.FLOOR, e * k), cur);
+    // никогда не дешевле мгновенной продажи + 1 — иначе купил и сразу продал в плюс (округление могло опустить)
+    const sv = State.sellValue(plate) + 1;
+    const price = Math.max(sv, niceRound(Math.max(e * B.FLOOR, e * k), cur));
     const type = unique ? (Math.random() < 0.6 ? 'stubborn' : 'dealer')
       : rollW(kind === 'over' ? { dealer: 0.6, stubborn: 0.2, soft: 0.2 } : { soft: 0.45, stubborn: 0.35, dealer: 0.2 });
     const sel = B.SELLERS[type];
-    const min = Math.min(price, niceRound(Math.max(e * B.FLOOR, price * rnd(...sel.min)), cur));
+    const min = Math.min(price, Math.max(sv, niceRound(Math.max(e * B.FLOOR, price * rnd(...sel.min)), cur)));
     const now = Date.now();
     const life = kind === 'deal' ? rnd(...B.DEAL_LIFE_MS) : rnd(...B.LIFE_MS);
     if (unique) State.markTaken(plate); // единственный экземпляр: теперь он «у продавца»
@@ -430,8 +447,9 @@ const Market = (() => {
     const sh = SH(), s = State.get();
     let changed = false;
     for (const o of sh.offers.filter(x => x.until <= now)) { closeOffer(o, 'expired', events); changed = true; }
-    for (const cur of ['rub', 'usd']) {
+    for (const cur of ['rub', 'usd', 'aed']) {
       if (cur === 'usd' && !s.us.visa) continue;
+      if (cur === 'aed' && !(s.ae && s.ae.visa)) continue;
       const [lo, hi] = B.FEED[cur];
       let n = sh.offers.filter(o => o.cur === cur).length;
       const filling = n < lo;
@@ -454,6 +472,8 @@ const Market = (() => {
   function closeOffer(o, why, events) {
     const sh = SH();
     sh.offers = sh.offers.filter(x => x !== o);
+    // уникальный номер никто не купил — он снова может выпасть в крутке
+    if (why === 'expired') { const k = P.uniqKey(o.plate); if (k && !State.get().found[o.plate]) State.untake(k); }
     for (const c of S().chats) {
       if (c.kind !== 'buy' || c.oid !== o.id || (c.status !== 'open' && c.status !== 'firm')) continue;
       c.status = 'gone'; c.reply = null;
@@ -518,8 +538,8 @@ const Market = (() => {
     s.stats.bought = (s.stats.bought || 0) + 1;
     if (o.kind === 'deal') s.claimed.flagBuyHot = true;
     if (price < o.price) s.claimed.flagHaggle = true;
+    if (tier >= C.TIER.mythic) s.claimed.flagBuyMyth = true;
     if (tier >= C.TIER.legendary) {
-      s.claimed.flagBuyLeg = true;
       s.legends.unshift({ p: o.plate, r: o.r, n: s.spins, t: Date.now(), how: 'market' });
       if (s.legends.length > 100) s.legends.length = 100;
     }

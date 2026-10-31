@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0b0820">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚘%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=mvrhslu2">
+<link rel="stylesheet" href="style.css?v=mvvi4zzi">
 </head>
 <body>
 <canvas id="fx"></canvas>
@@ -16,7 +16,7 @@
   <header>
     <div id="logo">БЛАТНОЙ НОМЕРОК</div>
     <div id="lvlBox">
-      <div class="lvlTop"><span class="lvlBadge">УР. <b id="lvlNum">1</b></span><span id="lvlTitle"></span></div>
+      <div class="lvlTop"><span class="lvlBadge">УР. <b id="lvlNum">1</b></span><span id="prestigeBadge" class="hidden"></span><span id="lvlTitle"></span></div>
       <div class="lvlBar"><div id="lvlFill"></div></div>
     </div>
     <div id="money" title="Кошелёк текущей страны"><span id="moneyCur">₽</span> <b id="moneyVal">0</b><small id="money2"></small></div>
@@ -29,6 +29,8 @@
       <button class="menuItem" id="btnShop">🛒 Магазин</button>
       <button class="menuItem" id="btnExchange">💱 Обменник</button>
       <button class="menuItem" id="btnProfile">👤 Профиль</button>
+      <button class="menuItem" id="btnDaily">🎁 Бонус за вход</button>
+      <button class="menuItem" id="btnPrestige">🔁 Перерождение</button>
       <button class="menuItem" id="btnSettings">⚙ Настройки</button>
       <button class="menuItem" id="btnDev">🛠 Разработчик</button>
     </nav>
@@ -64,11 +66,12 @@
       </div>
       <label id="autoRow" class="hidden"><input type="checkbox" id="autoChk"> автокрутка</label>
       <div id="pityRow">
-        <span>без легендарного: <b id="pityLeg">0</b></span>
+        <span title="Гарант легендарки: чем дольше без легендарки, тем выше шанс, а к концу счётчика она выпадет точно">🛡 гарант легендарки через: <b id="pityLeg">0</b></span>
         <span id="chargeInfo"></span>
       </div>
       <div id="bottomBtns">
-        <button id="modeBtn">🚗 Тип: Гражданские</button>
+        <button id="modeBtn">🌍 Страна: Россия</button>
+        <button id="typeBtn">🚗 Тип: Гражданские</button>
         <button id="regBtn">📍 Регион: Любой</button>
         <button id="vipBtn">💎 Гарант: выкл</button>
       </div>
@@ -130,8 +133,16 @@
 <!-- Тип номеров -->
 <div id="modes" class="overlay hidden">
   <div class="panel narrow">
-    <div class="panelHead"><h2>Тип номеров</h2><button class="closeBtn" data-close="modes">✕</button></div>
+    <div class="panelHead"><h2>🌍 Страна</h2><button class="closeBtn" data-close="modes">✕</button></div>
     <div class="panelBody" id="modesBody"></div>
+  </div>
+</div>
+
+<!-- Тип номеров России: гражданские / военные -->
+<div id="types" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>🇷🇺 Тип номеров</h2><button class="closeBtn" data-close="types">✕</button></div>
+    <div class="panelBody" id="typesBody"></div>
   </div>
 </div>
 
@@ -175,15 +186,44 @@
   </div>
 </div>
 
+<!-- Бонус за вход -->
+<div id="daily" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>🎁 Бонус за вход</h2><button class="closeBtn" data-close="daily">✕</button></div>
+    <div class="panelBody" id="dailyBody"></div>
+  </div>
+</div>
+
+<!-- Перерождение -->
+<div id="prestige" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>🔁 Перерождение</h2><button class="closeBtn" data-close="prestige">✕</button></div>
+    <div class="panelBody" id="prestigeBody"></div>
+  </div>
+</div>
+
+<!-- Что нового -->
+<div id="news" class="overlay hidden">
+  <div class="panel narrow">
+    <div class="panelHead"><h2>🆕 Что нового</h2><button class="closeBtn" data-close="news">✕</button></div>
+    <div class="panelBody" id="newsBody"></div>
+  </div>
+</div>
+
 <!-- Чёрный конверт (мифик и секрет): интрига с посимвольным раскрытием -->
 <div id="darkReveal" class="hidden">
   <div id="drGlow"></div>
+  <div id="drFx"><canvas class="drMatrix"></canvas><div class="drRays"></div><div class="drScan"></div><div class="drHalo"></div></div>
+  <div id="drStamp">СЕКРЕТНО</div>
   <div id="drContent">
     <div id="drPlate"></div>
     <div id="drTitle" class="hidden"></div>
     <div id="drSub">что-то очень редкое…</div>
   </div>
 </div>
+
+<!-- Божественный: свет, номер с крыльями и нимбом спускается, барабаны -->
+<div id="divineReveal" class="hidden"></div>
 
 <!-- Момент славы (легендарка+) -->
 <div id="bigMoment" class="hidden">
@@ -202,15 +242,15 @@
 
 <div id="toasts"></div>
 
-<script src="js/config.js?v=mvrhslu2"></script>
-<script src="js/plates.js?v=mvrhslu2"></script>
-<script src="js/state.js?v=mvrhslu2"></script>
-<script src="js/audio.js?v=mvrhslu2"></script>
-<script src="js/fx.js?v=mvrhslu2"></script>
-<script src="js/ui.js?v=mvrhslu2"></script>
-<script src="js/market.js?v=mvrhslu2"></script>
-<script src="js/phone.js?v=mvrhslu2"></script>
-<script src="js/main.js?v=mvrhslu2"></script>
-<script src="js/tg.js?v=mvrhslu2"></script>
+<script src="js/config.js?v=mvvi4zzi"></script>
+<script src="js/plates.js?v=mvvi4zzi"></script>
+<script src="js/state.js?v=mvvi4zzi"></script>
+<script src="js/audio.js?v=mvvi4zzi"></script>
+<script src="js/fx.js?v=mvvi4zzi"></script>
+<script src="js/ui.js?v=mvvi4zzi"></script>
+<script src="js/market.js?v=mvvi4zzi"></script>
+<script src="js/phone.js?v=mvvi4zzi"></script>
+<script src="js/main.js?v=mvvi4zzi"></script>
+<script src="js/tg.js?v=mvvi4zzi"></script>
 </body>
 </html>

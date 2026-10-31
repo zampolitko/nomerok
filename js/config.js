@@ -2,6 +2,45 @@
 // Всё, что балансится — здесь. Работает и в браузере, и в node (для тестов).
 const CFG = {};
 
+// Версия игры и «Что нового» — окошко показывается один раз после обновления
+CFG.VERSION = '1.3';
+// Меню разработчика в Telegram видно только этим аккаунтам (Telegram ID — в ⚙ Настройках игры в боте).
+// На компе (не в Telegram) меню доступно всегда.
+CFG.OWNER_TG_IDS = [5828595837];
+CFG.CHANGELOG = [
+  { v: '1.3', title: 'Обновление 1.3 — Дубай и красота', items: [
+    '🇦🇪 Эмираты: виза, дирхамы, 7 эмиратов, номера из 1–5 цифр — однозначный уже мифик, а «P 7» — самый дорогой номер в игре',
+    '💎 Новый баланс: крутка в среднем окупается «в ноль». Редкое дороже: легендарка ×1.5, мифик ×4, секретка ×3',
+    '✨ Божественные переделаны: теперь это 4 «невозможных» номера на всю игру — 777777 777, военный 0000 ОО 00, пустая табличка Калифорнии и «0» Дубая. Шанс 1 к 5 млн, цена космическая',
+    '🎁 Бонус за вход: 7 дней подряд, на 7-й день заряд 25×',
+    '🎨 Скины табличек в магазине: грязная, ржавая, рамка, неон, хром',
+    '🔁 Перерождение: сожги деньги и гараж за вечные +10% к продажам',
+    '🎬 Особые раскрытия: мифик — угли и дрожь, секретка — глитч и штамп «СЕКРЕТНО», божественный — золотые лучи, ореол и дождь монет',
+    '✨ Новый дизайн: стекло, блики на табличках, плавные панели, монеты летят в кошелёк',
+  ] },
+  { v: '1.2', title: 'Обновление 1.2 — всё по-честному', items: [
+    '✨ Новая редкость «Божественный»: мифик или секретка с шансом 1 к 25 выпадает золотым — цена ×10, своё золотое раскрытие',
+    '🔒 Единственными в игре остались только мифики и секретки — легендарки снова могут повторяться',
+    '🕶 Новые секретки: 4 в России, 4 у военных (впервые!), в США — именные EVANTUS и ZAMPOLIT',
+    '💸 Экономика жёстче: крутка в среднем возвращает 90% цены — богатеешь только на редких находках',
+    '🚫 Из магазина убраны «Удача» и «Множитель ₽» — деньги за купленные уровни вернулись',
+    '🏅 Новые достижения: 40 штук, уровни I–V, вкладки, секретные «???», награды билетами заряда и очки',
+  ] },
+  { v: '1.1', title: 'Обновление 1.1', items: [
+    '🌍 Страна выбирается отдельно от типа номеров: Россия (гражданские / военные) и США',
+    '🎖 У военных номеров — выбор кода войск, как регион у гражданских',
+    '🕶 Справочник секреток: в коллекциях видны все секретки каждой страны с ценой',
+    '✅ Секретки и именные мифики засчитываются в коллекцию сразу при находке, даже если продать',
+    '♻ Секретка с рынка, которую никто не купил, снова может выпасть',
+    '📱 Рынок: лента листается, американцам отвечаем по-английски, видно лоуболлеров и коллекционеров, понятно что даёт рейтинг',
+    '🕵 Военный мифик больше не виден до чёрного конверта',
+    '🛡 Счётчик гаранта показывает, через сколько круток будет легендарка',
+    '📌 Номер, по которому не успел решить, не теряется при закрытии игры',
+    '🔧 Табличка больше не дёргается при прокрутке, меню разработчика — только у хозяина',
+  ] },
+  { v: '1.0', title: 'Запуск в Telegram', items: ['Игра в Telegram, сейв в облаке, вёрстка под телефон'] },
+];
+
 // Разрешённые буквы на российских номерах
 CFG.LETTERS = 'АВЕКМНОРСТУХ';
 
@@ -15,14 +54,29 @@ CFG.RARITIES = [
   { key: 'legendary', name: 'Легендарный', color: '#fbbf24', chance: 3000 },
   { key: 'mythic',    name: 'Мифический',  color: '#fb7185', chance: 100000 },
   { key: 'secret',    name: 'Секретный',   color: '#e879f9', chance: 300000 },
+  { key: 'divine',    name: 'Божественный', color: '#ffd54a', chance: 5000000 },
 ];
+// Божественные — четыре «невозможных» номера, по одному на страну/тип. Каждый существует один раз на всю игру,
+// ловится отдельным броском (как секретка), цена фиксированная и космическая. Хранится как 'DV:ключ'.
+// pin — где падает при выбранном регионе/штате/эмирате (null — при любом)
+CFG.DIVINE_CHANCE = 1 / 5000000;
+CFG.DIVINE_PLATES = [
+  { key: 'ru',  mode: 'civ', pin: '777', cur: 'rub', price: 1000000000, name: 'Семь семёрок',  show: '777777 777',     where: 'Россия, гражданские · регион 777 или «любой»' },
+  { key: 'mil', mode: 'mil', pin: null,  cur: 'rub', price: 500000000,  name: 'Верховный',     show: '0000 ОО 00',     where: 'Россия, военные · любой код войск' },
+  { key: 'us',  mode: 'us',  pin: 'CA',  cur: 'usd', price: 30000000,   name: 'Пустота',       show: 'California · пусто', where: 'США · Калифорния или «любой штат»' },
+  { key: 'ae',  mode: 'ae',  pin: 'DXB', cur: 'aed', price: 200000000,  name: 'Ноль Дубая',    show: 'DUBAI 0',        where: 'Эмираты · Дубай или «любой эмират»' },
+];
+// Надбавка за редкость к цене: деньги из обычных номеров переехали в редкие (средняя крутка всё равно ×0.9)
+CFG.TIER_BONUS = { legendary: 1.5, mythic: 4, secret: 3 };
+// Средний возврат крутки (в долях цены) — цель калибровки баз всех стран: 1.0 = «в ноль»
+CFG.TARGET_RETURN = 1.0;
 CFG.TIER = {}; // key -> индекс
 CFG.RARITIES.forEach((r, i) => { CFG.TIER[r.key] = i; });
 
 // Цена номера = PLATE_BASE × произведение множителей сочетаний × регион × «Множитель ₽»
-CFG.PLATE_BASE = 12;
+CFG.PLATE_BASE = 2.88; // крутка в среднем «в ноль» (CFG.TARGET_RETURN), калибровка test/calib-civ.js
 // Верхние границы множителя сочетаний для тиров 0..4; выше последней — мифик
-CFG.RARITY_THRESH = [4, 30, 150, 4000, 36000]; // мифик ≥36000 — вдвое реже прежнего
+CFG.RARITY_THRESH = [4, 30, 150, 4000, 30000]; // мифик ≥30000
 CFG.SECRET_MULT = 100000; // фиксированный множитель секретных номеров
 
 // Тиры регионов. На каждой крутке регион случаен (weight — шанс тира в %),
@@ -148,7 +202,7 @@ CFG.COMBOS = [
     test: p => CFG._weeklySets().includes(p.ls) },
 ];
 // награда за первое открытие сочетания
-CFG.COMBO_REWARD = c => Math.min(50000, Math.max(200, c.mult * 100));
+CFG.COMBO_REWARD = c => Math.min(20000, Math.max(100, c.mult * 20));
 CFG.COMBOS_COMPLETE_REWARD = 1000000;
 
 // Серии недели: детерминированно от номера ISO-недели
@@ -205,8 +259,19 @@ CFG.SECRET_PLATES = [
   { key: 'one',   plate: 'А001АА', reg: '77',  name: 'Номер один страны' },
   { key: 'abs',   plate: 'А777АА', reg: '777', name: 'Абсолют' },
   { key: 'xan1',  plate: 'Х001АН', reg: '777', name: 'Хан №1' },
+  { key: 'vor1',  plate: 'В001ОР', reg: '77',  name: 'Вор №1' },
+  { key: 'kot1',  plate: 'К001ОТ', reg: '78',  name: 'Питерский кот №1' },
+  { key: 'xam1',  plate: 'Х001АМ', reg: '05',  name: 'Хамло №1' },
+  { key: 'msk1',  plate: 'М001СК', reg: '*',   name: 'Москва №1' },
 ];
-CFG.SECRET_CHANCE = 1 / 300000;
+// Военные секретки (тело «1234АВ» + код войск, '*' — любой код)
+CFG.MIL_SECRETS = [
+  { key: 'gs1',   plate: '0001АА', reg: '10', name: 'Генштаб №1' },
+  { key: 'mo1',   plate: '0001ММ', reg: '77', name: 'Министр обороны' },
+  { key: 'may9',  plate: '0905ВВ', reg: '*',  name: 'День Победы' },
+  { key: 'feb23', plate: '2302ЕЕ', reg: '*',  name: 'Защитник Отечества' },
+];
+CFG.SECRET_CHANCE = 1 / 500000;
 
 // Pity-гарант (только легендарный)
 CFG.PITY = {
@@ -222,9 +287,9 @@ CFG.SPIN_COST = 100;            // базовая цена крутки (умн�
 // VIP-гаранты: платная крутка с редкостью не ниже выбранной (+ надбавка региона).
 // Матожидание ниже цены — инструмент охотника, не фарма.
 CFG.VIP = [
-  { key: 'rare',      cost: 4500 },
-  { key: 'epic',      cost: 12000 },
-  { key: 'legendary', cost: 230000 },
+  { key: 'rare',      cost: 1750 },
+  { key: 'epic',      cost: 6900 },
+  { key: 'legendary', cost: 157000 },
 ];
 
 // Заряженные крутки: каждая N-я крутка бросает mult номеров и берёт самый дорогой.
@@ -239,20 +304,19 @@ CFG.CHARGES = [
 CFG.UPGRADES = {
   speed: { name: 'Скорость крутки', desc: 'Анимация короче на 9% за уровень',
     costs: [1400, 3500, 8500, 21000, 50000, 115000, 260000, 580000, 1300000, 2900000] },
-  luck:  { name: 'Удача', desc: '+2% за уровень шанс бросить два номера и взять лучший',
-    costs: [2800, 7000, 17000, 43000, 100000, 230000, 520000, 1150000, 2600000, 5800000] },
-  mult:  { name: 'Множитель ₽', desc: '+20% к продажам за уровень',
-    costs: [2100, 5600, 14000, 36000, 86000, 200000, 460000, 1000000, 2300000, 5000000] },
   auto:  { name: 'Автокрутка', desc: 'Крутит сама. Уровни сокращают паузу между крутками',
     costs: [14000, 70000, 350000, 1400000] },
-  garage: { name: 'Гараж: +50 мест', desc: 'Больше места под номера. Легендарки и выше лежат в сейфе и места не занимают',
+  garage: { name: 'Гараж: +50 мест', desc: 'Больше места под номера. Мифики и секретки лежат в сейфе и места не занимают',
     costs: [200000, 800000, 3000000, 10000000, 30000000, 80000000] },
   slots: { name: 'Слоты на рынке', desc: '+1 объявление одновременно на «Блатном Рынке»',
     costs: [300000, 1500000, 6000000] },
 };
 
-// Удача: шанс двойного броска за уровень
-CFG.LUCK_PER_LVL = 0.02;
+// «Удача» и «Множитель ₽» убраны из магазина (v9, по-честному): деньги за них вернулись игрокам
+CFG.REFUND_V9 = {
+  luck: [2800, 7000, 17000, 43000, 100000, 230000, 520000, 1150000, 2600000, 5800000],
+  mult: [2100, 5600, 14000, 36000, 86000, 200000, 460000, 1000000, 2300000, 5000000],
+};
 
 CFG.SPIN_BASE_MS = 1600;        // базовая длительность анимации
 CFG.SPIN_SPEED_FACTOR = 0.91;   // множитель за уровень скорости
@@ -275,41 +339,82 @@ CFG.MILESTONES = {
 // Награды за закрытие коллекционных наборов
 CFG.SET_REWARDS = { words: 350000, mythics: 1500000, secrets: 2500000, dates: 2000000 };
 
-// Достижения: test получает состояние игры
-CFG.ACHIEVEMENTS = [
-  { id: 'spin1',     name: 'Первая крутка',         desc: 'С почином!',                          reward: 200,    test: s => s.spins >= 1 },
-  { id: 'spin100',   name: 'Разогрелся',            desc: '100 круток',                          reward: 1000,   test: s => s.spins >= 100 },
-  { id: 'spin1k',    name: 'Барабанщик',            desc: '1 000 круток',                        reward: 5000,   test: s => s.spins >= 1000 },
-  { id: 'spin10k',   name: 'Однорукий бандит',      desc: '10 000 круток',                       reward: 30000,  test: s => s.spins >= 10000 },
-  { id: 'rare1',     name: 'Синий огонёк',          desc: 'Поймай редкий номер',                 reward: 500,    test: s => s.counts.rare >= 1 },
-  { id: 'epic1',     name: 'Фиолетовое настроение', desc: 'Поймай эпический номер',              reward: 2000,   test: s => s.counts.epic >= 1 },
-  { id: 'leg1',      name: 'Золотая жила',          desc: 'Поймай легендарный номер',            reward: 10000,  test: s => s.counts.legendary >= 1 },
-  { id: 'myth1',     name: 'Легенда гаража',        desc: 'Поймай мифический номер',             reward: 50000,  test: s => s.counts.mythic >= 1 },
-  { id: 'sec1',      name: 'Теневой коллекционер',  desc: 'Поймай секретный номер',              reward: 100000, test: s => s.counts.secret >= 1 },
-  { id: 'gar10',     name: 'Завёл гараж',           desc: '10 номеров в гараже',                 reward: 800,    test: s => Object.keys(s.found).length >= 10 },
-  { id: 'gar50',     name: 'Коллекционер',          desc: '50 номеров в гараже',                 reward: 4000,   test: s => Object.keys(s.found).length >= 50 },
-  { id: 'gar200',    name: 'Музей номеров',         desc: '200 номеров в гараже',                reward: 20000,  test: s => Object.keys(s.found).length >= 200 },
-  { id: 'words5',    name: 'Начитанный',            desc: '5 словесных номеров',                 reward: 5000,   test: s => Object.keys(s.sets.words).length >= 5 },
-  { id: 'lyam',      name: 'Первый лям',            desc: 'Накопи 1 000 000 ₽',                  reward: 25000,  test: s => s.money >= 1000000 },
-  { id: 'spent100k', name: 'Прожигатель',           desc: 'Потрать 100 000 ₽',                   reward: 5000,   test: s => s.stats.spent >= 100000 },
-  { id: 'charge10',  name: 'Заряженный',            desc: 'Открути 10 круток удачи (5×/25×)',    reward: 8000,   test: s => s.stats.charges >= 10 },
-  { id: 'market1',   name: 'Первая сделка',         desc: 'Продай номер на рынке',               reward: 5000,   test: s => (s.stats.market || 0) >= 1 },
-  { id: 'market25',  name: 'Барыга',                desc: '25 сделок на рынке',                  reward: 50000,  test: s => (s.stats.market || 0) >= 25 },
-  { id: 'raid1',     name: 'Попал под облаву',      desc: 'Переживи облаву',                     reward: 3000,   test: s => (s.stats.raids || 0) >= 1 },
-  { id: 'lvl10',     name: 'Авторитет',             desc: 'Достигни 10 уровня',                  reward: 15000,  test: s => (s.level || 1) >= 10 },
-  { id: 'blat1',     name: 'Блатной',               desc: 'Поймай блатную серию',                reward: 5000,   test: s => (s.combos.blat || 0) >= 1 },
-  { id: 'visa',      name: 'Гражданин мира',        desc: 'Купи визу в США',                     reward: 50000,  test: s => !!(s.us && s.us.visa) },
-  { id: 'vanity1',   name: 'Именной',               desc: 'Поймай именную табличку США',         reward: 30000,  test: s => (s.combos.uvan || 0) + (s.combos.uvtop || 0) >= 1 },
-  { id: 'states15',  name: 'Road trip',             desc: 'Собери в гараже все 15 штатов',       reward: 500000, test: s => Object.keys((s.sets && s.sets.states) || {}).length >= CFG.US_STATES.length },
-  { id: 'overEst',   name: 'Умеешь продать',        desc: 'Продай на рынке дороже оценки ×1.5',  reward: 15000,  test: s => !!s.claimed.flagOverEst },
-  { id: 'buy1',      name: 'Покупатель',            desc: 'Купи номер на рынке',                 reward: 3000,   test: s => (s.stats.bought || 0) >= 1 },
-  { id: 'buyHot',    name: 'Урвал',                 desc: 'Купи номер по 🔥 срочной цене',        reward: 8000,   test: s => !!s.claimed.flagBuyHot },
-  { id: 'buyHaggle', name: 'Сбил цену',             desc: 'Выторгуй скидку у продавца',          reward: 8000,   test: s => !!s.claimed.flagHaggle },
-  { id: 'buyLeg',    name: 'Охотник за легендами',  desc: 'Купи легендарку или выше на рынке',   reward: 100000, test: s => !!s.claimed.flagBuyLeg },
-  { id: 'lowball10', name: 'Не на того напали',     desc: 'Отшей 10 лоуболлеров',                reward: 10000,  test: s => (s.stats.lowballs || 0) >= 10 },
-  { id: 'pity5',     name: 'Награда за терпение',   desc: 'Поймай 5 pity-гарантов',              reward: 3000,   test: s => s.stats.pityTrig >= 5 },
-  { id: 'elite1',    name: 'Три топора',            desc: 'Оставь в гараже номер региона 777/799', reward: 15000, test: s => s.stats.eliteKept >= 1 },
+// ============ ДОСТИЖЕНИЯ (v9) ============
+// Уровни I–V: goals — пороги, prog(s) — текущий прогресс. Одиночные — goals: [1].
+// secret: true — видно «???», пока не получишь. Награды: деньги + билеты заряда (лучший из 3).
+CFG.ACH_CATS = [
+  { key: 'spins',  name: '🎰 Крутки' },
+  { key: 'finds',  name: '💎 Находки' },
+  { key: 'coll',   name: '🏆 Коллекции' },
+  { key: 'market', name: '📱 Рынок' },
+  { key: 'world',  name: '🌍 Страны' },
+  { key: 'secret', name: '🤫 Секретные' },
 ];
+CFG.ACH_TIER = { // награды и очки по уровню (0 = I)
+  money:   [2000, 8000, 30000, 100000, 300000],
+  tickets: [0, 1, 2, 3, 5],
+  points:  [10, 20, 40, 80, 160],
+};
+CFG.ACH_SINGLE = { money: 10000, tickets: 1, points: 30 };
+CFG.ACH_SECRET = { money: 25000, tickets: 2, points: 50 };
+{
+  const cnt = (s, ...keys) => keys.reduce((a, k) => a + ((s.counts || {})[k] || 0), 0);
+  const len = o => Object.keys(o || {}).length;
+  const flag = k => s => (s.claimed[k] ? 1 : 0);
+  CFG.ACH = [
+    // --- крутки ---
+    { id: 'spins',   cat: 'spins', icon: '🥁', name: 'Барабанщик',          desc: 'Открути {n} раз',                  goals: [100, 1000, 5000, 20000, 100000], prog: s => s.spins },
+    { id: 'charges', cat: 'spins', icon: '⚡', name: 'Заряженный',           desc: 'Открути {n} круток удачи 5×/25×',  goals: [5, 25, 100, 300, 1000], prog: s => s.stats.charges || 0 },
+    { id: 'vips',    cat: 'spins', icon: '💎', name: 'Гарантист',            desc: 'Крутани {n} VIP-гарантов',         goals: [1, 10, 50, 200], prog: s => s.stats.vips || 0 },
+    { id: 'pity',    cat: 'spins', icon: '🛡', name: 'Награда за терпение',  desc: 'Поймай {n} гарантов легендарки',   goals: [1, 5, 15], prog: s => s.stats.pityTrig || 0 },
+    { id: 'raids',   cat: 'spins', icon: '🚨', name: 'Попал под облаву',     desc: 'Переживи {n} облав',               goals: [1, 5, 20], prog: s => s.stats.raids || 0 },
+    { id: 'prestige', cat: 'spins', icon: '🔁', name: 'Перерождённый',   desc: 'Переродись {n} раз',               goals: [1, 3, 5], prog: s => s.prestige || 0 },
+    { id: 'level',   cat: 'spins', icon: '⭐', name: 'Авторитет',            desc: 'Достигни {n} уровня',              goals: [5, 10, 25, 50, 100], prog: s => s.level },
+    // --- находки ---
+    { id: 'rares',   cat: 'finds', icon: '🔵', name: 'Синий огонёк',         desc: 'Поймай {n} редких и выше',         goals: [10, 100, 1000], prog: s => cnt(s, 'rare', 'epic', 'legendary', 'mythic', 'secret', 'divine') },
+    { id: 'epics',   cat: 'finds', icon: '🟣', name: 'Фиолетовое настроение', desc: 'Поймай {n} эпических и выше',    goals: [1, 25, 250], prog: s => cnt(s, 'epic', 'legendary', 'mythic', 'secret', 'divine') },
+    { id: 'legs',    cat: 'finds', icon: '🟡', name: 'Золотая жила',         desc: 'Поймай {n} легендарных и выше',    goals: [1, 10, 50, 200], prog: s => cnt(s, 'legendary', 'mythic', 'secret', 'divine') },
+    { id: 'myths',   cat: 'finds', icon: '🔴', name: 'Легенда гаража',       desc: 'Поймай {n} мификов и выше',        goals: [1, 5, 20], prog: s => cnt(s, 'mythic', 'secret', 'divine') },
+    { id: 'secrets', cat: 'finds', icon: '🕶', name: 'Теневой коллекционер', desc: 'Найди {n} секреток',               goals: [1, 5, 10, 26], prog: s => len(s.sets.secrets) + len(s.sets.usSecrets) + len(s.sets.milSecrets) + len(s.sets.aeSecrets) },
+    { id: 'divine',  cat: 'finds', icon: '✨', name: 'Божественное вмешательство', desc: 'Поймай {n} божественных номеров',goals: [1, 2, 4], prog: s => len(s.sets.divine) },
+    { id: 'blat',    cat: 'finds', icon: '😎', name: 'Блатной',              desc: 'Поймай {n} блатных серий',         goals: [1, 10, 50], prog: s => s.combos.blat || 0 },
+    // --- коллекции ---
+    { id: 'garage',  cat: 'coll', icon: '🏠', name: 'Музей номеров',         desc: '{n} номеров в гараже',             goals: [10, 50, 100, 200, 400], prog: s => len(s.found) },
+    { id: 'words',   cat: 'coll', icon: '📖', name: 'Начитанный',            desc: 'Собери {n} слов в словаре',        goals: [5, 10, 21], prog: s => len(s.sets.words) },
+    { id: 'dates',   cat: 'coll', icon: '🎖', name: 'Летописец',             desc: 'Собери {n} великих дат',           goals: [3, 7, 14], prog: s => len(s.sets.dates) },
+    { id: 'combos',  cat: 'coll', icon: '📒', name: 'Знаток сочетаний',      desc: 'Открой {n} сочетаний',             goals: [10, 25, 50, 80], prog: s => len(s.combos) },
+    { id: 'named',   cat: 'coll', icon: '🔥', name: 'Именные легенды',       desc: 'Собери {n} именных мификов',       goals: [1, 4, 8], prog: s => len(s.sets.mythics) },
+    { id: 'elite',   cat: 'coll', icon: '🪓', name: 'Три топора',            desc: 'Оставь в гараже {n} номеров 777/799', goals: [1, 10, 50], prog: s => s.stats.eliteKept || 0 },
+    // --- рынок ---
+    { id: 'deals',   cat: 'market', icon: '🤝', name: 'Барыга',              desc: 'Продай {n} номеров на рынке',      goals: [1, 10, 50, 100], prog: s => s.stats.market || 0 },
+    { id: 'bought',  cat: 'market', icon: '🛍', name: 'Покупатель',          desc: 'Купи {n} номеров на рынке',        goals: [1, 10, 50], prog: s => s.stats.bought || 0 },
+    { id: 'lowball', cat: 'market', icon: '🤡', name: 'Не на того напали',   desc: 'Отшей {n} лоуболлеров',            goals: [10, 50, 200], prog: s => s.stats.lowballs || 0 },
+    { id: 'overEst', cat: 'market', icon: '💰', name: 'Умеешь продать',      desc: 'Продай на рынке дороже оценки ×1.5', goals: [1], prog: flag('flagOverEst') },
+    { id: 'haggle',  cat: 'market', icon: '✂', name: 'Сбил цену',            desc: 'Выторгуй скидку у продавца',       goals: [1], prog: flag('flagHaggle') },
+    { id: 'buyHot',  cat: 'market', icon: '🔥', name: 'Урвал',               desc: 'Купи номер по 🔥 срочной цене',     goals: [1], prog: flag('flagBuyHot') },
+    { id: 'buyMyth', cat: 'market', icon: '🏹', name: 'Охотник за мификами', desc: 'Купи мифик или секретку на рынке', goals: [1], prog: flag('flagBuyMyth') },
+    // --- страны ---
+    { id: 'visa',    cat: 'world', icon: '🛂', name: 'Гражданин мира',       desc: 'Купи визу в США',                  goals: [1], prog: s => (s.us.visa ? 1 : 0) },
+    { id: 'states',  cat: 'world', icon: '🗺', name: 'Road trip',            desc: 'Собери {n} штатов',                goals: [5, 10, 15], prog: s => len(s.sets.states) },
+    { id: 'vanity',  cat: 'world', icon: '✍', name: 'Именной',               desc: 'Собери {n} именных табличек США',  goals: [1, 5, 15, 30], prog: s => len(s.sets.vanity) },
+    { id: 'mil',     cat: 'world', icon: '🪖', name: 'Срочная служба',       desc: 'Открути {n} военных номеров',      goals: [100, 1000, 10000], prog: s => s.stats.milSpins || 0 },
+    { id: 'usa',     cat: 'world', icon: '🗽', name: 'Американская мечта',   desc: 'Открути {n} американских номеров', goals: [100, 1000, 10000], prog: s => s.stats.usSpins || 0 },
+    { id: 'aeVisa',  cat: 'world', icon: '🇦🇪', name: 'Шейх',                 desc: 'Купи визу в Эмираты',              goals: [1], prog: s => (s.ae && s.ae.visa ? 1 : 0) },
+    { id: 'emirates', cat: 'world', icon: '🏜', name: 'Семь эмиратов',       desc: 'Собери {n} эмиратов',              goals: [3, 7], prog: s => Object.keys(s.sets.emirates || {}).length },
+    { id: 'aeSpins', cat: 'world', icon: '🐪', name: 'Песчаная буря',        desc: 'Открути {n} номеров Эмиратов',     goals: [100, 1000, 10000], prog: s => s.stats.aeSpins || 0 },
+    { id: 'aed',     cat: 'world', icon: '💰', name: 'Нефтяной магнат',      desc: 'Накопи {n} AED',                   goals: [1e5, 1e6, 1e7], prog: s => s.rec.maxAed || 0 },
+    { id: 'money',   cat: 'world', icon: '🤑', name: 'Капиталист',           desc: 'Накопи {n} ₽',                     goals: [1e6, 1e7, 1e8, 1e9], prog: s => s.rec.maxMoney || 0 },
+    { id: 'usd',     cat: 'world', icon: '💵', name: 'Долларовый миллионер', desc: 'Накопи ${n}',                      goals: [1e4, 1e5, 1e6], prog: s => s.rec.maxUsd || 0 },
+    // --- секретные: видно «???», пока не получишь ---
+    { id: 'soldMyth', cat: 'secret', secret: true, icon: '🤦', name: 'Сам себе лоуболлер', desc: 'Продай мифик или секретку сразу, не торгуясь', hint: 'жадность фраера сгубила…', goals: [1], prog: flag('flagSoldMyth') },
+    { id: 'unlucky',  cat: 'secret', secret: true, icon: '🌧', name: 'Невезучий',          desc: '300 круток подряд без редкого', hint: 'бывает и такое', goals: [1], prog: s => (s.rec.maxStreak >= 300 ? 1 : 0) },
+    { id: 'myYear',   cat: 'secret', secret: true, icon: '🎂', name: 'Свой год',           desc: 'Поймай военный номер со своим годом рождения', hint: 'загляни в настройки', goals: [1], prog: s => (s.combos.mmine ? 1 : 0) },
+    { id: 'broke',    cat: 'secret', secret: true, icon: '🪫', name: 'Банкрот',            desc: 'Крутани, когда денег нет совсем', hint: 'дно пробито', goals: [1], prog: flag('flagBroke') },
+    { id: 'night',    cat: 'secret', secret: true, icon: '🌙', name: 'Ночной гонщик',      desc: 'Крути между 3 и 5 часами ночи', hint: 'не спится?', goals: [1], prog: flag('flagNight') },
+    { id: 'devil',    cat: 'secret', secret: true, icon: '😈', name: 'Дьявольщина',        desc: 'Оставь в гараже номер с цифрами 666', hint: 'число зверя', goals: [1], prog: flag('flagDevil') },
+    { id: 'lucky7',   cat: 'secret', secret: true, icon: '🍀', name: 'Счастливая крутка',  desc: 'Сделай 7 777 круток', hint: 'семь, семь, семь…', goals: [1], prog: s => (s.spins >= 7777 ? 1 : 0) },
+  ];
+}
 
 // Задания дня: каждый день случайные 3 из пула, сложность тоже случайная
 CFG.DAILY_POOL = [
@@ -321,16 +426,47 @@ CFG.DAILY_POOL = [
 ];
 CFG.DAILY_COUNT = 3;
 
+// Бонус за вход: серия дней подряд (пропуск — серия с начала). money — множитель от уровня,
+// tickets — билеты заряда, charge — следующая ручная крутка «лучший из N»
+CFG.LOGIN = {
+  MONEY: lvl => 1500 + 500 * lvl,
+  DAYS: [
+    { money: 1 },
+    { tickets: 1 },
+    { money: 2 },
+    { tickets: 2 },
+    { money: 4 },
+    { tickets: 3 },
+    { charge: 25, money: 6 },
+  ],
+};
+
 // ============ ВОЕННЫЕ НОМЕРА ============
 // Формат «1234 АВ 77»: 4 цифры, 2 буквы, код войск 10–99. Чёрная табличка, белые символы.
 // Отдельный режим (переключатель «Тип номеров»), с гражданскими не смешиваются.
 CFG.MIL = {
   COST_MULT: 3,                        // военная крутка дороже гражданской
-  PLATE_BASE: 140,                     // база цены (калибровка test/calib-mil.js: EV ≈ 2.2× цены)
-  RARITY_THRESH: [2, 12, 40, 480, 4800], // мифик ≥4800 — реже; по квантилям: ~75% / 93% / 98.6% / 1-1/2500 / 1-1/40000
-  CHANCES: [null, 6, 15, 82, 2000, 89000], // справочное «1 к N» для интерфейса (из test/sim.js)
+  PLATE_BASE: 41.8,                    // база цены под CFG.TARGET_RETURN с учётом кода войск (test/calib-mil.js)
+  RARITY_THRESH: [2, 12, 40, 480, 4000], // мифик ≥4000
+  CHANCES: [null, 6, 15, 82, 2000, 89000, 300000, 5000000], // справочное «1 к N» для интерфейса (из test/sim.js)
   CODES: Array.from({ length: 90 }, (_, i) => String(10 + i)),
 };
+// Коды войск по тирам — как регионы у гражданских: случайный код выпадает по весам,
+// выбранный код дороже крутка (costMult поверх военной ×3), продажа × sellMult
+CFG.MIL_CODE_TIERS = [
+  { key: 't0', name: 'Обычные части', sellMult: 1, costMult: 2, weight: 85, codes: [] }, // все остальные коды
+  { key: 't1', name: 'Округа', sellMult: 1.5, costMult: 3, weight: 10,
+    codes: ['20', '21', '23', '25', '27', '32', '34', '43', '45', '50', '51', '52'] },
+  { key: 't2', name: 'Гвардия', sellMult: 2, costMult: 5, weight: 4,
+    codes: ['11', '22', '33', '44', '55', '66', '88', '99'] },
+  { key: 't3', name: 'Генштаб', sellMult: 3, costMult: 8, weight: 1, codes: ['10', '77'] },
+];
+{
+  const special = new Set(CFG.MIL_CODE_TIERS.flatMap(t => t.codes));
+  CFG.MIL_CODE_TIERS[0].codes = CFG.MIL.CODES.filter(c => !special.has(c));
+}
+CFG.MIL_CODE_TIER = {}; // код -> тир
+CFG.MIL_CODE_TIERS.forEach(t => t.codes.forEach(c => { CFG.MIL_CODE_TIER[c] = t; }));
 
 // Исторические даты для сочетания «Великая дата»
 CFG.MIL_DATES = {
@@ -401,20 +537,20 @@ CFG.US = {
   VISA_PRICE: 5000000,        // ₽
   START_USD: 1000,
   SPIN_COST: 10,              // $
-  PLATE_BASE: 4.5,            // $ — калибровка test/calib-us.js (EV ≈ 2.2× цены крутки)
-  RARITY_THRESH: [2, 4, 30, 600, 3600], // по квантилям; мифик ≥4000 — реже
-  CHANCES: [null, 6, 27, 84, 2400, 117000], // справочное «1 к N» (из test/sim.js)
+  PLATE_BASE: 1.56,           // $ — под CFG.TARGET_RETURN (выборка 15 млн номеров)
+  RARITY_THRESH: [2, 4, 30, 600, 3000], // мифик ≥3000 (выше топ-именных ×2500)
+  CHANCES: [null, 6, 27, 84, 2400, 117000, 300000, 5000000], // справочное «1 к N» (из test/sim.js)
   RATE: 90,                   // 1 $ = 90 ₽
   FEE: 0.08,                  // комиссия обменника
   LETTERS: 'ABCDEFGHJKLMNPRSTUVWXYZ', // без I, O, Q — как на настоящих табличках
   VANITY_CHANCE: 1 / 400,     // шанс именной таблички на бросок
-  SECRET_CHANCE: 1 / 300000,
+  SECRET_CHANCE: 1 / 500000,
 };
 // гаранты в долларах
 CFG.US.VIP = [
-  { key: 'rare',      cost: 500 },
-  { key: 'epic',      cost: 1600 },
-  { key: 'legendary', cost: 18000 },
+  { key: 'rare',      cost: 195 },
+  { key: 'epic',      cost: 720 },
+  { key: 'legendary', cost: 11000 },
 ];
 
 // Штаты: формат (L — буква, D — цифра, остальное как есть), цвета, прозвище.
@@ -459,6 +595,8 @@ CFG.US_SECRETS = [
   { key: 'potus', t: 'POTUS',  st: '*',  name: 'Президентский' },
   { key: 'area',  t: 'AREA51', st: 'NV', name: 'Зона 51' },
   { key: 'holly', t: 'HOLLYWD', st: 'CA', name: 'Голливуд' },
+  { key: 'evantus',  t: 'EVANTUS',  st: '*', name: 'Evantus' },
+  { key: 'zampolit', t: 'ZAMPOLIT', st: '*', name: 'Zampolit' },
 ];
 
 // Сочетания США. p = { st, t (текст без -/пробелов), dg (цифры подряд), lt (буквы подряд), van }
@@ -509,8 +647,84 @@ CFG.US_COMBOS = [
     test: p => p.van && CFG.US_VANITY.top.includes(p.t) },
 ];
 
+// ============ ДУБАЙ / ЭМИРАТЫ (Часть 3) ============
+// Номер хранится 'AE:DXB:AA:12345' — эмират, буквенный код, 1–5 цифр. Чем меньше цифр — тем реже и дороже.
+CFG.AE = {
+  VISA_PRICE: 25000000,       // ₽
+  START_AED: 2000,
+  SPIN_COST: 40,              // дирхамов
+  PLATE_BASE: 10.4,           // AED — под CFG.TARGET_RETURN, калибровка test/calib-ae.js (точный перебор)
+  RARITY_THRESH: [3, 5, 15, 200, 7500], // калибровка test/calib-ae.js (точный перебор)
+  CHANCES: [null, 16, 29, 53, 2260, 100000, 500000, 5000000], // «1 к N» из test/calib-ae.js
+  RATE: 25,                   // 1 AED = 25 ₽
+  FEE: 0.08,                  // комиссия обменника
+  LETTERS: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  DOUBLE_CODE: 0.15,          // доля двухбуквенных кодов (AA, BC…)
+  // сколько цифр в номере: [цифр, вес]
+  LEN_W: [[5, 0.73759], [4, 0.25], [3, 0.012], [2, 0.0004], [1, 0.00001]],
+  SECRET_CHANCE: 1 / 500000,
+};
+// гаранты в дирхамах (калибровка test/sim.js: в среднем минус)
+CFG.AE.VIP = [
+  { key: 'rare',      cost: 690 },
+  { key: 'epic',      cost: 1160 },
+  { key: 'legendary', cost: 30000 },
+];
+CFG.AE_TIERS = {
+  t0: { name: 'Северные эмираты', weight: 60, sellMult: 1,   costMult: 2 },
+  t1: { name: 'Шарджа',           weight: 25, sellMult: 1.5, costMult: 3 },
+  t2: { name: 'Дубай и Абу-Даби', weight: 15, sellMult: 2,   costMult: 5 },
+};
+CFG.AE_EMIRATES = [
+  { em: 'DXB', name: 'Дубай',          en: 'DUBAI',          ar: 'دبي',        tier: 't2', ac: '#c8102e' },
+  { em: 'AUH', name: 'Абу-Даби',       en: 'ABU DHABI',      ar: 'أبوظبي',     tier: 't2', ac: '#9f1239' },
+  { em: 'SHJ', name: 'Шарджа',         en: 'SHARJAH',        ar: 'الشارقة',    tier: 't1', ac: '#0f766e' },
+  { em: 'AJM', name: 'Аджман',         en: 'AJMAN',          ar: 'عجمان',      tier: 't0', ac: '#1d4ed8' },
+  { em: 'RAK', name: 'Рас-эль-Хайма',  en: 'RAS AL KHAIMAH', ar: 'رأس الخيمة', tier: 't0', ac: '#9a3412' },
+  { em: 'FUJ', name: 'Фуджейра',       en: 'FUJAIRAH',       ar: 'الفجيرة',    tier: 't0', ac: '#047857' },
+  { em: 'UAQ', name: 'Умм-эль-Кайвайн', en: 'UMM AL QUWAIN', ar: 'أم القيوين', tier: 't0', ac: '#6b21a8' },
+];
+CFG.AE_EM = {};
+CFG.AE_EMIRATES.forEach(e => { CFG.AE_EM[e.em] = e; });
+// Секретки Эмиратов: точный код и число ('*' — любой эмират)
+CFG.AE_SECRETS = [
+  { key: 'p7',   em: 'DXB', code: 'P',  num: '7', name: 'P 7 — самый дорогой номер мира' },
+  { key: 'aa8',  em: 'DXB', code: 'AA', num: '8', name: 'Двойная восьмёрка' },
+  { key: 'd5',   em: 'DXB', code: 'D',  num: '5', name: 'D 5' },
+  { key: 'auh1', em: 'AUH', code: 'A',  num: '1', name: 'Абу-Даби №1' },
+  { key: 'shj1', em: 'SHJ', code: 'A',  num: '1', name: 'Шарджа №1' },
+];
+// Сочетания Эмиратов. p = { em, code, num, len }. Внутри группы g работает только самое дорогое
+CFG.AE_COMBOS = [
+  { id: 'a1',     g: 'alen',  name: 'Однозначный',            desc: 'Всего одна цифра',                    ex: 'A 7',       mult: 8000, test: p => p.len === 1 },
+  { id: 'a2',     g: 'alen',  name: 'Двузначный',             desc: 'Всего две цифры',                     ex: 'B 77',      mult: 200,  test: p => p.len === 2 },
+  { id: 'a3',     g: 'alen',  name: 'Трёхзначный',            desc: 'Три цифры',                           ex: 'C 123',     mult: 15,   test: p => p.len === 3 },
+  { id: 'a4',     g: 'alen',  name: 'Четырёхзначный',         desc: 'Четыре цифры',                        ex: 'D 1234',    mult: 2,    test: p => p.len === 4 },
+  { id: 'aall',   g: 'arep',  name: 'Все цифры одинаковые',   desc: 'Номер из одной повторяющейся цифры',  ex: '77 / 5555', mult: 10,   test: p => p.len >= 2 && /^(\d)\1+$/.test(p.num) },
+  { id: 'a4same', g: 'arep',  name: 'Четыре одинаковых',      desc: 'Четыре одинаковые цифры подряд',      ex: '13333',     mult: 15,   test: p => /(\d)\1\1\1/.test(p.num) },
+  { id: 'a3same', g: 'arep',  name: 'Три одинаковых',         desc: 'Три одинаковые цифры подряд',         ex: '47772',     mult: 4,    test: p => /(\d)\1\1/.test(p.num) },
+  { id: 'aseq',   g: 'aseq',  name: 'Лесенка',                desc: 'Цифры подряд по возрастанию или убыванию', ex: '12345', mult: 12,  test: p => p.len >= 3 && ('0123456789'.includes(p.num) || '9876543210'.includes(p.num)) },
+  { id: 'amir',   g: 'amir',  name: 'Зеркало',                desc: 'Читается одинаково с обеих сторон',   ex: '12321',     mult: 5,    test: p => p.len >= 3 && p.num === [...p.num].reverse().join('') && !/^(\d)\1+$/.test(p.num) },
+  { id: 'a786',   g: 'aluck', name: 'Число 786',              desc: 'Счастливое число Востока',            ex: '786 / 17863', mult: 15, test: p => p.num.includes('786') },
+  { id: 'around', g: 'around', name: 'Круглый',               desc: 'Заканчивается на 000',                ex: '5000',      mult: 6,    test: p => p.len >= 4 && p.num.endsWith('000') },
+  { id: 'acodeA', g: 'acode', name: 'Код A',                  desc: 'Самый первый буквенный код',          ex: 'A 12345',   mult: 1.5,  test: p => p.code === 'A' },
+  { id: 'acode2', g: 'acode', name: 'Двойной код',            desc: 'Код из двух одинаковых букв',         ex: 'AA / ZZ',   mult: 3,    test: p => p.code.length === 2 && p.code[0] === p.code[1] },
+];
+
 // Гараж: вместимость BASE + STEP за уровень апгрейда «Гараж». Уникальные номера (легендарка+) — в сейфе, не считаются
 CFG.GARAGE = { BASE: 100, STEP: 50 };
+
+// Перерождение: накопи NEED(n) ₽ — сожги деньги, обычные номера и апгрейды, получи +BONUS к продажам навсегда
+CFG.PRESTIGE = { NEED: n => 100000000 * Math.pow(3, n), BONUS: 0.1 };
+
+// Скины табличек — чистая красота, на цену не влияют (золото — только у божественных)
+CFG.SKINS = [
+  { key: 'dirty',  name: 'Грязная',          desc: 'Пыль трассы и брызги из луж — номер, который повидал жизнь', cost: 30000 },
+  { key: 'rusty',  name: 'Ржавая',           desc: 'Рыжие подтёки и облезлая краска. Олдскул',                    cost: 120000 },
+  { key: 'frame',  name: 'Рамка «Блатной»',  desc: 'Чёрная рамка с хромированной кромкой',                        cost: 400000 },
+  { key: 'neon',   name: 'Неон',             desc: 'Подсветка, которая переливается всеми цветами',               cost: 1500000 },
+  { key: 'chrome', name: 'Хром',             desc: 'Зеркальная табличка с бегущим бликом',                        cost: 6000000 },
+];
 
 // ============ ТОРГОВАЯ ПЛОЩАДКА «БЛАТНОЙ РЫНОК» (в телефоне) ============
 // Выставляешь номер из гаража за свою цену; покупатели пишут в случайный момент:
@@ -518,7 +732,7 @@ CFG.GARAGE = { BASE: 100, STEP: 50 };
 CFG.MARKET = {
   FEE: 0.05,                   // комиссия площадки с продажи
   BASE_SLOTS: 3,               // объявлений одновременно (+ апгрейд «Слоты на рынке»)
-  EST_MULT: 1.5,               // рыночная оценка = мгновенная продажа × 1.5
+  EST_MULT: 1.3,               // рыночная оценка = мгновенная продажа × 1.3
   PRICE_MIN: 0.5, PRICE_MAX: 5, // ползунок цены — доля оценки
   BASE_WAIT_MS: 45000,         // ожидание при цене 0.8 оценки; дальше растёт экспонентой
   WAIT_GROWTH: 2.2,
@@ -527,14 +741,14 @@ CFG.MARKET = {
   REPLY_MS: [2500, 8000],      // покупатель «печатает» ответ
   OFFLINE_CAP: 5,              // сколько новых покупателей максимум накопится, пока игра закрыта
   BUMP_FEE: 0.03,              // «Поднять объявление»: 3% цены
-  BUMP_MIN: { rub: 500, usd: 5 },
+  BUMP_MIN: { rub: 500, usd: 5, aed: 20 },
   BUMP_MS: 10 * 60 * 1000,     // поднятие действует 10 минут
   BUMP_SPEED: 0.35,            // ожидание ×0.35 пока поднято
   // рейтинг продавца: уровень = √сделок (до 10). Каждый уровень: −3% ожидания, +2% к оценке покупателей
   RATING_MAX: 10,
   // --- покупка: объявления других продавцов (вкладка «🛍 Купить») ---
   BUY: {
-    FEED: { rub: [8, 12], usd: [5, 8] },     // сколько объявлений в ленте (мин, макс)
+    FEED: { rub: [8, 12], usd: [5, 8], aed: [5, 8] },     // сколько объявлений в ленте (мин, макс)
     SPAWN_MS: [40000, 100000],               // новое объявление, пока лента не полная
     LIFE_MS: [5 * 60000, 30 * 60000],        // сколько живёт объявление
     DEAL_LIFE_MS: [60000, 180000],           // «🔥 Срочно» — исчезает за 1–3 минуты
@@ -543,9 +757,9 @@ CFG.MARKET = {
     ROLL: { secret: 0.002, mythic: 0.01, legendary: 0.04, epic: 0.10, wanted: 0.22 },
     FILLER: { common: 0.35, uncommon: 0.40, rare: 0.25 },
     KIND: { fair: 0.55, over: 0.30, deal: 0.15 },
-    PRICE: { fair: [0.9, 1.15], over: [1.5, 3], deal: [0.72, 0.85] }, // доля рыночной оценки
+    PRICE: { fair: [0.9, 1.15], over: [1.5, 3], deal: [0.8, 0.9] }, // доля рыночной оценки
     UNIQUE_K: { legendary: [1.3, 2], mythic: [2, 3], secret: [2.5, 4] }, // уникальные — всегда с наценкой
-    FLOOR: 0.72, // ниже оценки×0.72 не продают никогда: мгновенная перепродажа не окупается
+    FLOOR: 0.8, // ниже оценки×0.8 не продают никогда: мгновенная перепродажа не окупается
     // продавцы: min — до какой доли цены готовы уступить, patience — сколько раз торгуются
     SELLERS: {
       stubborn: { name: 'упёртый',     min: [0.93, 1],    patience: 1 },
@@ -559,7 +773,7 @@ CFG.MARKET = {
 // XP: за крутку 1 + 2 за каждую ступень редкости. Порог уровня n: XP_BASE × n^1.5
 CFG.LEVEL = {
   XP_BASE: 40,
-  REWARD: lvl => 500 * lvl,     // деньги за новый уровень
+  REWARD: lvl => 300 * lvl,     // деньги за новый уровень
   TICKET_EVERY: 5,              // каждые 5 уровней — билет заряда
   TICKET_TRIES: 3,              // билет = следующая крутка «лучший из 3»
   TITLES: ['Пешеход', 'Водила', 'Таксист', 'Пацан с района', 'Перекупщик', 'Коллекционер',

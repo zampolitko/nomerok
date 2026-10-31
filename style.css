@@ -11,7 +11,7 @@ body {
 .hidden { display: none !important; }
 b { font-weight: 700; }
 
-#fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+#fx { position: fixed; inset: 0; pointer-events: none; z-index: 260; } /* над раскрытием и моментом славы, под тостами */
 
 #app { display: flex; flex-direction: column; height: 100vh; }
 
@@ -40,7 +40,7 @@ header {
 }
 .navbtn:hover { background: #2a2066; box-shadow: 0 0 12px rgba(120, 90, 255, .4); }
 /* бургер-меню */
-header { position: relative; }
+header { position: relative; z-index: 20; } /* над лентой «Последние»: размытие шапки делает её отдельным слоем, меню внутри неё */
 #mainMenu {
   position: absolute; top: calc(100% + 6px); right: 12px; z-index: 250;
   display: flex; flex-direction: column; min-width: 190px;
@@ -1178,3 +1178,464 @@ button, .plate, input[type=checkbox] { touch-action: manipulation; }
   width: 100%; background: #0e0a28; color: #cfd4ff; border: 1px solid #3a2f7a; border-radius: 10px;
   padding: 8px; font-family: monospace; font-size: 12px; resize: vertical;
 }
+
+/* рынок: метки в чатах и рейтинг */
+.phChatMid em.lb { background: #fee2e2; color: #b91c1c; }
+.phRating { background: #fff; border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+/* «Что нового» и версия */
+.newsBlock { background: #1b1540; border: 1px solid #3a2f7a; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.newsBlock.old { opacity: .6; }
+.newsHead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.newsHead span { color: #8d93ad; font-size: 12px; }
+.newsBlock ul { padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: #cfd4ff; }
+.newsOk { width: 100%; padding: 12px; font-size: 16px; }
+.setVer { margin-top: 14px; text-align: center; font-size: 12px; color: #6f7694; }
+.setVer a { color: #a78bfa; }
+/* заглушка «чёрного конверта» сильнее цветов любой таблички (военной, США) — без спойлеров */
+.plate.blinded, .plate.blinded * { color: transparent !important; text-shadow: none !important; }
+.plate.blinded { background: #0b0d12 !important; }
+.plate.blinded .usTop, .plate.blinded .usNick { visibility: hidden; }
+/* справочник секреток */
+.secSlot { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.secSlot.secTodo .plate { opacity: .55; filter: grayscale(.4); }
+.secVal { color: #ffe17d !important; font-weight: 700; }
+/* ячейки символов на табличке: ширина по самым широким знакам шрифта (цифра ≈.45em, буква ≈.8em, М .94em) */
+.plate .p-main > span, .plate .p-regnum { line-height: 1; letter-spacing: 0; }
+.plate .p-main i, .plate .p-regnum i { display: inline-block; font-style: normal; text-align: center; }
+.plate .p-d i, .plate .p-regnum i { width: .48em; }
+.plate .p-l i { width: .84em; }
+.plate .p-main { gap: .14em; }
+/* кнопка «Тип» (Россия) — как «Страна»; военная карточка кода — чёрная табличка */
+#typeBtn {
+  background: #1b1540; color: #cfd4ff; border: 1px solid #3a2f7a;
+  padding: 9px 20px; border-radius: 22px; font-size: 14px; cursor: pointer; transition: .15s;
+}
+#typeBtn:hover { background: #2a2066; box-shadow: 0 0 14px rgba(120, 90, 255, .4); }
+#typeBtn.modeMil { border-color: #6b7280; background: #16181d; color: #e5e7eb; }
+#typeBtn.hidden { display: none; }
+.regCard.milCard { background: #101318; color: #f2f4f7; border-color: #000; outline-color: #4a5059; }
+/* ✨ Божественный: золотая табличка, переливается */
+.plate.goldPlate {
+  background: linear-gradient(115deg, #7a5410 0%, #f5d26b 22%, #fff3c4 35%, #d9a82e 50%, #fbe08a 68%, #8a6214 100%) !important;
+  background-size: 220% 100% !important;
+  color: #3a2603 !important; border-color: #5c3d06 !important; outline-color: #ffe9a3 !important;
+  text-shadow: 0 1px 0 rgba(255, 248, 220, .7) !important;
+  animation: goldShine 3.2s linear infinite, divineGlow 1.4s ease-in-out infinite alternate;
+}
+.plate.goldPlate .p-reg { border-left-color: #5c3d06 !important; }
+.plate.goldPlate .usTop, .plate.goldPlate .usNick, .plate.goldPlate .usText { color: #3a2603 !important; }
+@keyframes goldShine { from { background-position: 0% 0; } to { background-position: 220% 0; } }
+@keyframes divineGlow {
+  from { box-shadow: 0 0 30px #ffd54acc, 0 0 70px #ffd54a55; }
+  to   { box-shadow: 0 0 60px #fff1a8, 0 0 150px #ffd54aaa; }
+}
+.r-divine { animation: divineGlow 1.4s ease-in-out infinite alternate; }
+/* золотое раскрытие вместо чёрного конверта */
+#darkReveal.drGold { background: radial-gradient(ellipse at center, #2a1d02 0%, #0a0700 70%); }
+#darkReveal.drGold #drPlate .plate.darkPlate { background: #1a1204; color: #ffe9a3; outline-color: #8a6214; text-shadow: 0 0 22px #ffd54a, 0 0 4px #fff; }
+#darkReveal.drGold #drTitle { color: #ffd54a; text-shadow: 0 0 24px #ffd54a; }
+/* достижения: уровни и прогресс */
+.achTabs { flex-wrap: wrap; }
+.achTabs .tabBtn { flex: 1 1 30%; font-size: 13px; padding: 7px 6px; }
+.achTier { color: #ffe17d; font-size: 12px; letter-spacing: 1px; margin-left: 4px; }
+.achBar { display: block; height: 5px; background: #241c52; border-radius: 3px; overflow: hidden; margin: 4px 0 2px; }
+.achBar i { display: block; height: 100%; background: linear-gradient(90deg, #8b5cf6, #ffe17d); }
+.achReward { text-align: right; line-height: 1.3; }
+.achTier i { font-style: normal; color: #3a2f7a; }
+.achTier i.on { color: #ffe17d; text-shadow: 0 0 6px #ffe17d88; }
+/* бонус за вход */
+.loginGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.loginDay {
+  position: relative; background: #1b1540; border: 1px solid #3a2f7a; border-radius: 12px; padding: 10px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 12px; color: #cfd4ff;
+}
+.loginDay b { font-size: 12px; color: #8d93ad; }
+.loginDay.ldBig { grid-column: span 2; background: linear-gradient(135deg, #3b2a05, #1b1540); border-color: #b4881f; }
+.loginDay.ld-got { opacity: .45; }
+.loginDay.ld-got i { position: absolute; top: 4px; right: 8px; color: #4ade80; font-style: normal; font-weight: 900; }
+.loginDay.ld-now { border-color: #ffe17d; box-shadow: 0 0 18px rgba(255, 225, 125, .45); animation: loginPulse 1.2s ease-in-out infinite alternate; }
+@keyframes loginPulse { to { transform: scale(1.05); box-shadow: 0 0 28px rgba(255, 225, 125, .7); } }
+.loginBtn { width: 100%; padding: 12px; font-size: 16px; }
+.loginBtn:disabled { opacity: .5; cursor: default; }
+/* ====== скины табличек ======
+   действуют на «свои» таблички: главная, гараж, витрина и превью в магазине. Золото божественных не трогаем */
+.skinGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 8px; }
+.skinCard { background: #1b1540; border: 1px solid #3a2f7a; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; }
+.skinCard small { color: #8d93ad; font-size: 11px; min-height: 28px; }
+.skinCard.skinOn { border-color: #8b5cf6; box-shadow: 0 0 14px rgba(139, 92, 246, .5); }
+.skinPreview { padding: 6px 0; }
+.skinPreview .plate { font-size: 17px; }
+:is(body[data-skin="dirty"] :is(#plateBox, .gCard, #showcase), .skinPreview[data-skin="dirty"]) .plate:not(.goldPlate):not(.blinded) {
+  filter: sepia(.35) contrast(.92) brightness(.9);
+  box-shadow: inset 0 0 .35em rgba(92, 64, 30, .55), inset .6em -.2em .9em rgba(120, 90, 50, .35), 0 4px 14px rgba(0,0,0,.6);
+}
+:is(body[data-skin="rusty"] :is(#plateBox, .gCard, #showcase), .skinPreview[data-skin="rusty"]) .plate:not(.goldPlate):not(.blinded) {
+  filter: sepia(.7) saturate(1.6) hue-rotate(-12deg) contrast(1.05);
+  box-shadow: inset 0 0 .5em rgba(150, 60, 10, .7), inset -.8em .3em 1em rgba(170, 80, 20, .45), 0 4px 14px rgba(0,0,0,.6);
+}
+:is(body[data-skin="frame"] :is(#plateBox, .gCard, #showcase), .skinPreview[data-skin="frame"]) .plate:not(.blinded) {
+  box-shadow: 0 0 0 .09em #0d0d0f, 0 0 0 .13em #c9ced6, 0 0 0 .15em #6b7280, 0 6px 16px rgba(0,0,0,.7);
+}
+:is(body[data-skin="neon"] :is(#plateBox, .gCard, #showcase), .skinPreview[data-skin="neon"]) .plate:not(.goldPlate):not(.blinded) {
+  animation: skinNeon 2.4s linear infinite;
+}
+@keyframes skinNeon {
+  0%   { box-shadow: 0 0 .25em #22d3ee, 0 0 .7em #22d3ee99; }
+  33%  { box-shadow: 0 0 .25em #f472b6, 0 0 .7em #f472b699; }
+  66%  { box-shadow: 0 0 .25em #a3e635, 0 0 .7em #a3e63599; }
+  100% { box-shadow: 0 0 .25em #22d3ee, 0 0 .7em #22d3ee99; }
+}
+:is(body[data-skin="chrome"] :is(#plateBox, .gCard, #showcase), .skinPreview[data-skin="chrome"]) .plate:not(.goldPlate):not(.blinded) {
+  background: linear-gradient(115deg, #8d939b 0%, #f4f6f8 22%, #b9bec5 40%, #ffffff 52%, #9aa0a8 70%, #e6e9ed 100%) !important;
+  background-size: 250% 100% !important;
+  animation: goldShine 3s linear infinite;
+  color: #1a1d22;
+}
+/* перерождение */
+#prestigeBadge { margin-left: 6px; font-size: 11px; filter: drop-shadow(0 0 4px #ffe17d); }
+.prTop { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 10px; }
+.prStar { font-size: 28px; filter: drop-shadow(0 0 10px #ffe17d); animation: loginPulse 1.6s ease-in-out infinite alternate; }
+.prTop small { color: #ffe17d; }
+.prCols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.prCol { border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #cfd4ff; }
+.prCol b { font-size: 14px; margin-bottom: 2px; }
+.prBurn { background: #2a1020; border: 1px solid #7a2040; }
+.prKeep { background: #102a20; border: 1px solid #1f7a4f; }
+.prBar { height: 8px; margin: 8px 0 12px; }
+.prBtn { width: 100%; }
+.prBtn:disabled { opacity: .5; cursor: default; }
+/* 🇦🇪 табличка Эмиратов: слева эмират и код (цвет эмирата), справа крупные цифры */
+.plate.aePlate {
+  align-items: stretch; background: linear-gradient(168deg, #ffffff 0%, #f3f4f2 45%, #e3e6e3 100%);
+  color: #111; font-family: 'Arial Narrow', 'Segoe UI', sans-serif; font-weight: 800;
+}
+.aePlate .aeLeft {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .02em;
+  margin: .08em; padding: .04em .22em; border-radius: .08em; min-width: 1.5em;
+  background: var(--aac); color: #fff; text-shadow: none;
+}
+.aePlate .aeEn { font-size: .2em; letter-spacing: .06em; white-space: nowrap; }
+.aePlate .aeAr { font-size: .24em; line-height: 1; }
+.aePlate .aeCode { font-size: .62em; line-height: 1; letter-spacing: .02em; }
+.aePlate .aeNum { display: flex; align-items: center; padding: .08em .35em .06em .28em; font-size: 1em; letter-spacing: .05em; font-variant-numeric: tabular-nums; }
+.plate.aePlate.blackPlate, .plate.aePlate.aeDark { background: #0b0d12; color: #f4f6f8; }
+.plate.aePlate.blackPlate .aeLeft, .plate.aePlate.aeDark .aeLeft { background: #1d2028; }
+.plate.aeMini { font-size: 16px; }
+#modeBtn.modeAe { border-color: #00732f; background: linear-gradient(90deg, #00732f, #111 55%, #c8102e); color: #fff; }
+
+/* =================== ОБНОВЛЕНИЕ 1.3: дизайн и анимации =================== */
+/* фон: ночной асфальт — шум + виньетка поверх неонового градиента */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0, 0, 0, .55) 100%);
+}
+#app { position: relative; z-index: 1; }
+#app.shaking { animation: appShake .55s cubic-bezier(.36, .07, .19, .97); }
+@keyframes appShake {
+  10%, 90% { transform: translate(calc(var(--shake) * -.3), 0); }
+  20%, 80% { transform: translate(calc(var(--shake) * .6), calc(var(--shake) * .3)); }
+  30%, 50%, 70% { transform: translate(calc(var(--shake) * -1), calc(var(--shake) * -.4)); }
+  40%, 60% { transform: translate(var(--shake), calc(var(--shake) * .4)); }
+}
+
+/* стекло: шапка, подвал, панели, меню */
+header, footer { background: rgba(14, 10, 36, .62) !important; backdrop-filter: blur(14px) saturate(1.3); }
+.panel {
+  background: linear-gradient(160deg, rgba(30, 22, 72, .92), rgba(14, 10, 38, .95)) !important;
+  border: 1px solid rgba(167, 139, 250, .28) !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .03) inset, 0 0 60px rgba(100, 70, 255, .18) !important;
+}
+#mainMenu { background: rgba(22, 16, 58, .92) !important; backdrop-filter: blur(16px); }
+
+/* панели появляются, а не выскакивают */
+.overlay:not(.hidden) { animation: ovFade .22s ease-out; }
+.overlay:not(.hidden) .panel { animation: panelIn .32s cubic-bezier(.2, 1.25, .4, 1); }
+@keyframes ovFade { from { opacity: 0; } }
+@keyframes panelIn { from { opacity: 0; transform: translateY(24px) scale(.96); } }
+#mainMenu:not(.hidden) { animation: menuIn .2s ease-out; transform-origin: top right; }
+@keyframes menuIn { from { opacity: 0; transform: scale(.92) translateY(-6px); } }
+.menuItem { transition: background .15s, padding-left .15s; }
+.menuItem:hover { padding-left: 20px; }
+
+/* кнопки: нажатие и лёгкая подсветка */
+button { transition: transform .1s ease, box-shadow .2s ease, filter .2s ease; }
+button:not(:disabled):active { transform: scale(.96); }
+.upBtn:not(:disabled):hover, .gSell:hover, .gStar:hover, .tabBtn:hover { filter: brightness(1.15); }
+
+/* кнопка КРУТИТЬ: бегущий блик */
+#spinBtn { position: relative; overflow: hidden; }
+#spinBtn::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .35), transparent);
+  transform: skewX(-20deg); animation: spinSheen 3.2s ease-in-out infinite; pointer-events: none;
+}
+#spinBtn:disabled::after { animation: none; }
+@keyframes spinSheen { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+
+/* редкость над табличкой выпрыгивает, полоски набегают */
+#riRarity:not(:empty) { animation: rarityPop .45s cubic-bezier(.2, 1.4, .4, 1); display: inline-block; }
+@keyframes rarityPop { from { opacity: 0; transform: scale(.5); letter-spacing: 12px; } }
+.riBar.on { animation: barIn .35s ease-out backwards; }
+.riBar:nth-child(2) { animation-delay: .05s; } .riBar:nth-child(3) { animation-delay: .1s; } .riBar:nth-child(4) { animation-delay: .15s; }
+.riBar:nth-child(5) { animation-delay: .2s; } .riBar:nth-child(6) { animation-delay: .25s; } .riBar:nth-child(7) { animation-delay: .3s; } .riBar:nth-child(8) { animation-delay: .35s; }
+@keyframes barIn { from { transform: scaleX(0); } }
+
+/* кошелёк: подпрыгивает зелёным при доходе, краснеет при трате */
+#money.mUp { animation: moneyUp .6s ease-out; }
+#money.mDown { animation: moneyDown .5s ease-out; }
+@keyframes moneyUp { 30% { transform: scale(1.12); color: #4ade80; text-shadow: 0 0 18px #4ade80; } }
+@keyframes moneyDown { 30% { color: #f87171; } }
+
+/* гараж и коллекции: карточки проявляются волной */
+.gCard, .gSlot, .achRow, .upCard, .skinCard, .loginDay { animation: cardIn .35s ease-out backwards; }
+.gCard:nth-child(1), .gSlot:nth-child(1), .achRow:nth-child(1) { animation-delay: .02s; }
+.gCard:nth-child(2), .gSlot:nth-child(2), .achRow:nth-child(2) { animation-delay: .05s; }
+.gCard:nth-child(3), .gSlot:nth-child(3), .achRow:nth-child(3) { animation-delay: .08s; }
+.gCard:nth-child(4), .gSlot:nth-child(4), .achRow:nth-child(4) { animation-delay: .11s; }
+.gCard:nth-child(5), .gSlot:nth-child(5), .achRow:nth-child(5) { animation-delay: .14s; }
+.gCard:nth-child(6), .gSlot:nth-child(6), .achRow:nth-child(6) { animation-delay: .17s; }
+.gCard:nth-child(n+7), .gSlot:nth-child(n+7), .achRow:nth-child(n+7) { animation-delay: .2s; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.gCard { transition: transform .15s, box-shadow .2s; }
+.gCard:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, .4); }
+.gSlot.foundSlot { position: relative; overflow: hidden; }
+.gSlot.foundSlot::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .08) 50%, transparent 70%);
+  background-size: 250% 100%; animation: goldShine 4s linear infinite;
+}
+
+/* табличка: реалистичнее — блик сверху и выдавленные символы */
+.plate:not(.goldPlate):not(.blinded):not(.usPlate):not(.aePlate):not(.milPlate):not(.blackPlate) {
+  background-image: linear-gradient(176deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, .08) 34%, rgba(255, 255, 255, 0) 46%),
+    url('img/plate-bg.png'), linear-gradient(168deg, #ffffff 0%, #f1f4f7 40%, #dfe4ea 75%, #eef1f4 100%);
+  background-size: 100% 100%, cover, 100% 100%;
+}
+.plate.milPlate:not(.blinded), .plate.blackPlate:not(.goldPlate):not(.blinded):not(.aePlate) {
+  background-image: linear-gradient(176deg, rgba(255, 255, 255, .14) 0%, rgba(255, 255, 255, .02) 36%, rgba(255, 255, 255, 0) 48%),
+    linear-gradient(168deg, #1a1d23 0%, #0d0f13 55%, #16191e 100%);
+}
+.plate:not(.blinded) .p-main, .plate:not(.blinded) .aeNum { text-shadow: 0 1px 0 rgba(255, 255, 255, .55), 0 -1px 0 rgba(0, 0, 0, .28); }
+.plate.milPlate:not(.blinded) .p-main, .plate.blackPlate:not(.blinded) .p-main { text-shadow: 0 1px 0 rgba(0, 0, 0, .8), 0 0 1px rgba(255, 255, 255, .3); }
+#plateBox .plate.landed { animation: landReal .5s cubic-bezier(.2, 1.3, .4, 1); }
+@keyframes landReal {
+  0% { transform: perspective(600px) rotateX(35deg) scale(1.12); filter: brightness(1.4); }
+  60% { transform: perspective(600px) rotateX(-6deg) scale(.97); }
+  100% { transform: none; filter: none; }
+}
+
+/* =================== особые раскрытия =================== */
+#drFx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#drFx > div { position: absolute; inset: 0; display: none; }
+#drStamp {
+  position: absolute; left: 50%; top: 20%; transform: translateX(-50%) rotate(-12deg) scale(3); opacity: 0;
+  font: 900 46px 'Arial Narrow', 'Segoe UI', sans-serif; letter-spacing: 8px; color: #ff3b5c;
+  border: 6px solid #ff3b5c; border-radius: 10px; padding: 4px 22px; pointer-events: none; display: none; z-index: 2;
+  text-shadow: 0 0 12px rgba(255, 59, 92, .6); box-shadow: 0 0 22px rgba(255, 59, 92, .4) inset;
+}
+/* мифик: багровое зарево снизу и сердцебиение */
+#darkReveal[data-r="mythic"] { background: radial-gradient(ellipse at 50% 120%, #4a0712 0%, #120206 45%, #000 80%); }
+#darkReveal[data-r="mythic"] #drContent { animation: heartbeat 1.1s ease-in-out infinite; }
+#darkReveal[data-r="mythic"].drDone #drContent { animation: none; }
+@keyframes heartbeat { 0%, 40%, 100% { transform: scale(1); } 15% { transform: scale(1.03); } 28% { transform: scale(.99); } }
+/* секретка: глитч, сканлайны, штамп «СЕКРЕТНО» */
+#darkReveal[data-r="secret"] { background: radial-gradient(ellipse at center, #1a0526 0%, #050008 75%); }
+#darkReveal[data-r="secret"] .drScan {
+  display: block; opacity: .35;
+  background: repeating-linear-gradient(180deg, rgba(232, 121, 249, .12) 0 2px, transparent 2px 5px);
+  animation: scanMove 6s linear infinite;
+}
+@keyframes scanMove { to { background-position: 0 200px; } }
+#darkReveal[data-r="secret"] #drPlate { animation: glitch 2.4s steps(1) infinite; }
+@keyframes glitch {
+  0%, 100% { transform: none; filter: none; }
+  7% { transform: translate(-4px, 1px) skewX(-6deg); filter: drop-shadow(4px 0 #38bdf8) drop-shadow(-4px 0 #e879f9); }
+  9% { transform: translate(3px, -2px); filter: drop-shadow(-3px 0 #38bdf8) drop-shadow(3px 0 #e879f9) hue-rotate(40deg); }
+  11% { transform: none; filter: none; }
+  58% { transform: translate(2px, 0) skewX(4deg); filter: drop-shadow(-5px 0 #e879f9); opacity: .8; }
+  60% { transform: none; filter: none; opacity: 1; }
+}
+#darkReveal[data-r="secret"].drDone #drPlate { animation: none; }
+#darkReveal[data-r="secret"].drDone #drStamp { display: block; animation: stampIn .45s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+@keyframes stampIn { to { opacity: .92; transform: translateX(-50%) rotate(-12deg) scale(1); } }
+/* божественный: вращающиеся лучи, ореол, золотой свет */
+#darkReveal[data-r="divine"] { background: radial-gradient(ellipse at center, #3a2a06 0%, #120c01 55%, #000 85%); }
+#darkReveal[data-r="divine"] .drRays {
+  display: block; inset: -50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 213, 74, .18) 0deg 6deg, transparent 6deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 62%); mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+  animation: raysSpin 18s linear infinite;
+}
+#darkReveal[data-r="divine"].drDone .drRays { animation-duration: 6s; filter: brightness(1.8); }
+@keyframes raysSpin { to { transform: rotate(360deg); } }
+#darkReveal[data-r="divine"] .drHalo {
+  display: block; left: 50%; top: 50%; right: auto; bottom: auto; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%;
+  border: 3px solid rgba(255, 225, 125, .5); box-shadow: 0 0 60px rgba(255, 213, 74, .5), inset 0 0 60px rgba(255, 213, 74, .35);
+  animation: haloPulse 2s ease-in-out infinite;
+}
+@keyframes haloPulse { 50% { transform: scale(1.06); opacity: .7; } }
+#darkReveal[data-r="divine"] #drTitle {
+  background: linear-gradient(90deg, #a8740f, #fff3c4, #ffd54a, #fff3c4, #a8740f); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent !important; animation: goldShine 2.5s linear infinite;
+}
+#drContent { z-index: 1; }
+@media (max-width: 560px) {
+  #drStamp { font-size: 30px; letter-spacing: 5px; }
+  #darkReveal[data-r="divine"] .drHalo { width: 300px; height: 300px; margin: -150px 0 0 -150px; }
+}
+
+/* ✨ божественные номера: перламутровое золото с переливом (поверх .goldPlate) */
+.plate.dvPlate.goldPlate {
+  background: linear-gradient(115deg, #8a6a1a 0%, #f7e7a1 18%, #fffdf2 30%, #f0c84a 46%, #fff6d0 60%, #c9a032 78%, #fff2b8 100%) !important;
+  background-size: 260% 100% !important;
+}
+.plate.dvPlate.goldPlate::before, .plate.dvPlate.goldPlate::after { background: radial-gradient(circle at 35% 30%, #fffbe6, #e0b53c 55%, #7a5410); }
+/* США: пустая табличка — посередине светящаяся пустота */
+.plate.dv-us .dvVoid {
+  min-width: 4.2em; min-height: 1em; border-radius: .12em;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, .95) 0%, rgba(255, 244, 200, .55) 40%, transparent 72%);
+  animation: voidPulse 2.2s ease-in-out infinite;
+}
+@keyframes voidPulse { 50% { opacity: .55; transform: scaleX(.92); } }
+.plate.dv-us.goldPlate .usTop, .plate.dv-us.goldPlate .usNick { color: #3a2603 !important; }
+/* Эмираты: «0» без буквы — плашка эмирата пустая */
+.plate.dv-ae .aeLeft { background: linear-gradient(160deg, #7a5410, #d9a82e) !important; }
+.plate.dv-ae .aeNum { min-width: 2.2em; justify-content: center; }
+/* раскрытие божественного: тёмная табличка в золоте */
+#drPlate .plate.dvPlate.darkPlate { background: #120d02 !important; color: #ffe9a3; outline-color: #8a6214; }
+#drPlate .plate.dvPlate.darkPlate .aeLeft { background: #2a1d04 !important; }
+#drPlate .plate.dv-us.darkPlate .dvVoid { min-width: 4.2em; min-height: 1em; }
+#drPlate .plate.dv-us.darkPlate .dvVoid.on { background: radial-gradient(ellipse, #fff8dd 0%, rgba(255, 213, 74, .5) 45%, transparent 75%); }
+/* слот коллекции, пока не найден */
+.dvUnknown {
+  width: 150px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font: 900 20px 'Arial Narrow', sans-serif; letter-spacing: 6px; color: #ffd54a88;
+  background: repeating-linear-gradient(135deg, #1b1540 0 8px, #241a52 8px 16px); border: 1px dashed #ffd54a55;
+}
+
+/* пункт меню с незабранной наградой */
+.menuItem.menuDot::after { content: " •"; color: #4ade80; font-weight: 900; }
+
+/* 🇦🇪 табличка Эмиратов v2 — как настоящая дубайская: белая, чёрная рамка, слева эмират по-английски и по-арабски
+   за вертикальной чертой, справа крупные буква-код и номер */
+.plate.aePlate {
+  background: linear-gradient(176deg, rgba(255, 255, 255, .7) 0%, rgba(255, 255, 255, 0) 45%), #fbfbfa !important;
+  color: #111; border: .07em solid #111 !important; border-radius: .09em; outline: none;
+  font-family: 'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif; font-weight: 800; align-items: stretch;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .55);
+}
+.plate.aePlate::before, .plate.aePlate::after { display: none; }
+.aePlate .aeLeft {
+  background: none !important; color: inherit; margin: 0; border-radius: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .03em;
+  padding: .05em .16em; min-width: 1.45em; border-right: .055em solid currentColor;
+}
+.aePlate .aeEn { font-size: .19em; font-weight: 900; letter-spacing: .03em; line-height: 1.05; text-align: center; white-space: normal; max-width: 6.5em; }
+.aePlate .aeAr { font-size: .27em; font-weight: 700; line-height: 1.1; font-family: 'Segoe UI', Tahoma, sans-serif; }
+.aePlate .aeMain { display: flex; align-items: center; gap: .32em; padding: .05em .34em .03em .3em; letter-spacing: .03em; }
+.aePlate .aeCode { font-size: 1em; line-height: 1; letter-spacing: .02em; }
+.aePlate .aeNum { font-size: 1em; padding: 0; display: inline; min-width: 0; font-variant-numeric: tabular-nums; }
+.plate.aePlate:not(.blinded) .aeMain { text-shadow: 0 1px 0 rgba(255, 255, 255, .6), 0 -1px 0 rgba(0, 0, 0, .25); }
+.plate.aePlate.blackPlate, .plate.aePlate.aeDark, .plate.aePlate.darkPlate {
+  background: linear-gradient(176deg, rgba(255, 255, 255, .1) 0%, rgba(255, 255, 255, 0) 45%), #0b0d12 !important;
+  color: #f4f6f8; border-color: #3a3f47 !important;
+}
+.plate.aePlate.blackPlate .aeMain, .plate.aePlate.darkPlate .aeMain { text-shadow: none; }
+/* божественный «0»: золото, номер по центру */
+.plate.aePlate.dvPlate.goldPlate { color: #3a2603; border-color: #5c3d06 !important; }
+.plate.dv-ae .aeMain { justify-content: center; min-width: 2.4em; }
+.plate.aeMini { font-size: 16px; }
+
+/* =================== раскрытия v2 =================== */
+/* секретка: чёрный экран, зелёный дождь 0101, символы «взламываются» */
+.drMatrix { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+#darkReveal[data-r="secret"] { background: #000 !important; }
+#darkReveal[data-r="secret"] .drMatrix { display: block; opacity: .55; }
+#darkReveal[data-r="secret"] .drScan { opacity: .18; }
+#darkReveal[data-r="secret"] #drGlow { background: radial-gradient(ellipse 60% 45% at 50% 50%, rgba(0, 0, 0, .85), transparent 75%); }
+#darkReveal[data-r="secret"] #drPlate .plate { box-shadow: 0 0 40px rgba(34, 197, 94, .35), 0 0 0 1px #14532d; }
+#darkReveal[data-r="secret"] .drCh.hackQ { color: #4ade80 !important; text-shadow: 0 0 10px #22c55e !important; opacity: 1 !important; filter: none !important; transform: none !important; }
+#darkReveal[data-r="secret"] .drCh.hacking { color: #bbf7d0 !important; text-shadow: 0 0 14px #22c55e, 2px 0 #e879f9, -2px 0 #38bdf8 !important;
+  opacity: 1 !important; filter: none !important; animation: hackShake .08s steps(2) infinite; }
+@keyframes hackShake { 50% { transform: translate(1px, -1px) skewX(-8deg); } }
+#darkReveal[data-r="secret"] .drCh.cracked { color: #fff !important; animation: crackPop .4s ease-out; }
+@keyframes crackPop { 0% { transform: scale(1.5); text-shadow: 0 0 22px #22c55e; color: #86efac; } }
+#darkReveal[data-r="secret"] #drTitle { color: #4ade80 !important; text-shadow: 0 0 18px #22c55e !important; font-family: Consolas, monospace; letter-spacing: 2px; }
+#darkReveal[data-r="secret"] #drSub { color: #22c55e; font-family: Consolas, monospace; }
+#darkReveal[data-r="secret"] .drScan { background: repeating-linear-gradient(180deg, rgba(34, 197, 94, .12) 0 2px, transparent 2px 5px) !important; }
+
+/* божественный: отдельный экран — темнота, свет, спуск с небес */
+#divineReveal { position: fixed; inset: 0; z-index: 215; background: #000; overflow: hidden; cursor: pointer; }
+#divineReveal .dvLight {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease-in;
+  background: radial-gradient(ellipse at 50% 35%, #ffffff 0%, #fffaf0 35%, #fbefcf 65%, #e9cf8a 100%);
+}
+#divineReveal .dvRays {
+  position: absolute; inset: -60%; opacity: 0; transition: opacity 3s;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255, 213, 74, .22) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 60%); mask-image: radial-gradient(circle, #000 0%, transparent 60%);
+  animation: raysSpin 24s linear infinite;
+}
+#divineReveal.dvS1 .dvLight { opacity: 1; }
+#divineReveal.dvS1 .dvRays { opacity: .9; }
+#divineReveal.dvDone .dvRays { animation-duration: 8s; opacity: 1; }
+/* ангел-табличка: спускается сверху, покачивается, крылья машут */
+#divineReveal .dvAngel {
+  position: absolute; left: 50%; top: -45%; transform: translate(-50%, -50%);
+  transition: top 4.8s cubic-bezier(.22, .68, .25, 1);
+  display: flex; align-items: center; justify-content: center; padding: 70px 150px 10px;
+}
+#divineReveal.dvS2 .dvAngel { top: 46%; animation: angelSway 3.2s ease-in-out infinite alternate; }
+@keyframes angelSway { from { rotate: -1.6deg; translate: 0 -6px; } to { rotate: 1.6deg; translate: 0 6px; } }
+#divineReveal .dvPlateBox { position: relative; z-index: 2; filter: drop-shadow(0 18px 30px rgba(140, 100, 20, .45)); }
+#divineReveal .dvPlateBox .plate { font-size: 64px; }
+#divineReveal .dvWing { position: absolute; top: 18px; width: 210px; z-index: 1; filter: drop-shadow(0 6px 12px rgba(160, 120, 30, .35)); }
+#divineReveal .dvWingL { left: -40px; transform-origin: 100% 40%; animation: flapL 1.1s ease-in-out infinite alternate; }
+#divineReveal .dvWingR { right: -40px; transform-origin: 0% 40%; animation: flapR 1.1s ease-in-out infinite alternate; }
+#divineReveal .dvWingR svg { transform: scaleX(-1); }
+@keyframes flapL { from { transform: rotate(14deg); } to { transform: rotate(-12deg); } }
+@keyframes flapR { from { transform: rotate(-14deg); } to { transform: rotate(12deg); } }
+#divineReveal.dvS3 .dvWing { animation-duration: 2.2s; }
+#divineReveal .dvHalo {
+  position: absolute; top: 4px; left: 50%; width: 220px; height: 46px; margin-left: -110px; border-radius: 50%; z-index: 3;
+  border: 7px solid #ffd54a; box-shadow: 0 0 26px #ffd54a, inset 0 0 16px #fff3c4, 0 0 60px rgba(255, 213, 74, .7);
+  animation: haloFloat 2.4s ease-in-out infinite alternate;
+}
+@keyframes haloFloat { to { transform: translateY(-8px); box-shadow: 0 0 40px #ffe17d, inset 0 0 22px #fffbe6, 0 0 90px rgba(255, 213, 74, .9); } }
+/* барабаны слота */
+#divineReveal .reel { display: inline-block; }
+#divineReveal .reel.spinning { filter: blur(1.4px); animation: reelJitter .07s linear infinite; }
+@keyframes reelJitter { 0% { transform: translateY(-.08em); } 100% { transform: translateY(.08em); } }
+#divineReveal .reel.stopped { animation: reelStop .4s cubic-bezier(.2, 1.7, .4, 1); }
+@keyframes reelStop { 0% { transform: translateY(-.35em) scale(1.25); filter: brightness(1.6); } }
+/* надписи */
+#divineReveal .dvTitle {
+  position: absolute; left: 0; right: 0; top: 70%; text-align: center; opacity: 0; transform: scale(.8); transition: opacity .8s, transform .8s cubic-bezier(.2, 1.4, .4, 1);
+  display: flex; flex-direction: column; gap: 4px; color: #5c3d06;
+}
+#divineReveal .dvTitle small { font-size: 16px; font-weight: 900; letter-spacing: 6px; color: #a8740f; }
+#divineReveal .dvTitle b {
+  font-size: 44px; font-weight: 900; letter-spacing: 2px;
+  background: linear-gradient(90deg, #8a6214, #d9a82e, #fff3c4, #d9a82e, #8a6214); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: goldShine 2.5s linear infinite;
+}
+#divineReveal .dvTitle span { font-size: 15px; font-weight: 700; color: #8a6214; }
+#divineReveal.dvDone .dvTitle { opacity: 1; transform: none; }
+#divineReveal .dvSub { position: absolute; left: 0; right: 0; bottom: 7%; text-align: center; color: #8a6214; font-size: 14px; letter-spacing: 2px; opacity: .8; }
+#divineReveal:not(.dvS1) .dvSub { color: #6b5a2a; }
+@media (max-width: 560px) {
+  #divineReveal .dvPlateBox .plate { font-size: min(44px, 11vw); }
+  #divineReveal .dvAngel { padding: 50px 70px 10px; }
+  #divineReveal .dvWing { width: 120px; top: 22px; }
+  #divineReveal .dvWingL { left: -10px; } #divineReveal .dvWingR { right: -10px; }
+  #divineReveal .dvHalo { width: 150px; height: 34px; margin-left: -75px; border-width: 5px; }
+  #divineReveal .dvTitle b { font-size: 30px; }
+}
+.plate.dv-ae .aeMain { flex: 1; }
+#divineReveal .dvAngel { width: max-content; }
+#divineReveal .plate .p-main, #divineReveal .plate .p-regnum, #divineReveal .plate .aeMain { white-space: nowrap; flex-wrap: nowrap; }
+#divineReveal .aeNum.reel { display: inline-block; min-width: .62em; text-align: center; }

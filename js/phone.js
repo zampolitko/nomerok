@@ -9,7 +9,8 @@ const Phone = (() => {
   let sellPlate = null;     // номер на экране выставления
   let sellK = 1;            // цена = оценка × k
   let buyCur = 'rub';       // лента покупки: рубли или доллары
-  let armedBuy = null;      // id объявления, ждущего подтверждения покупки
+  let armedBuy = null;
+  let lastView = '';        // какой экран нарисован — чтобы сохранять прокрутку      // id объявления, ждущего подтверждения покупки
   const SELLER = { stubborn: 'упёртый', soft: 'сговорчивый', dealer: 'барыга' };
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -106,13 +107,14 @@ const Phone = (() => {
   }
   function screenBuy() {
     const s = State.get();
-    if (buyCur === 'usd' && !s.us.visa) buyCur = 'rub';
+    if ((buyCur === 'usd' && !s.us.visa) || (buyCur === 'aed' && !s.ae.visa)) buyCur = 'rub';
     const list = Market.offers(buyCur).slice().sort((a, b) =>
       (b.kind === 'unique') - (a.kind === 'unique') || (b.kind === 'deal') - (a.kind === 'deal') || b.t - a.t);
     let h = appHeader('Купить номер') + `<div class="phBody">`;
-    if (s.us.visa) h += `<div class="phSeg">
+    if (s.us.visa || s.ae.visa) h += `<div class="phSeg">
       <button class="${buyCur === 'rub' ? 'on' : ''}" data-act="buyCur" data-cur="rub">🇷🇺 Рубли</button>
-      <button class="${buyCur === 'usd' ? 'on' : ''}" data-act="buyCur" data-cur="usd">🇺🇸 Доллары</button></div>`;
+      ${s.us.visa ? `<button class="${buyCur === 'usd' ? 'on' : ''}" data-act="buyCur" data-cur="usd">🇺🇸 Доллары</button>` : ''}
+      ${s.ae.visa ? `<button class="${buyCur === 'aed' ? 'on' : ''}" data-act="buyCur" data-cur="aed">🇦🇪 Дирхамы</button>` : ''}</div>`;
     h += `<div class="phHint">Баланс: <b>${Market.money(State.balance(buyCur), buyCur)}</b> · гараж ${State.garageUsed()}/${State.garageCap()}<br>
       Объявления других продавцов. 🔥 срочные исчезают за пару минут, с остальными можно поторговаться.</div>`;
     if (!list.length) h += '<div class="phEmpty">Объявлений пока нет — загляни чуть позже.</div>';
@@ -173,8 +175,8 @@ const Phone = (() => {
 
   function screenSell() {
     const s = State.get();
-    const plates = Object.keys(s.found).sort((a, b) => State.sellValue(b) * (Market.curOf(b) === 'usd' ? CFG.US.RATE : 1)
-      - State.sellValue(a) * (Market.curOf(a) === 'usd' ? CFG.US.RATE : 1));
+    const inRub = p => State.sellValue(p) * ({ usd: CFG.US.RATE, aed: CFG.AE.RATE }[Market.curOf(p)] || 1);
+    const plates = Object.keys(s.found).sort((a, b) => inRub(b) - inRub(a));
     const full = Market.active().length >= Market.slots();
     let h = appHeader('Продать номер') + `<div class="phBody">
       <div class="phHint">${full ? '⚠ Все слоты заняты — сними объявление или купи слот в магазине' : 'Выбери номер из гаража — дорогие сверху'}</div>`;
@@ -212,7 +214,7 @@ const Phone = (() => {
       <div class="phRow"><span>Мгновенная продажа</span><b>${Market.money(State.sellValue(sellPlate), cur)}</b></div>
       <div class="phRow"><span>Рыночная оценка</span><b>${Market.money(est, cur)}</b></div>
       ${Market.interesting(sellPlate) ? '<div class="phTag">🧐 Интересный номер — коллекционеры будут писать чаще</div>' : ''}
-      <label class="phPriceIn"><span>${cur === 'usd' ? '$' : '₽'}</span>
+      <label class="phPriceIn"><span>${cur === 'usd' ? '$' : cur === 'aed' ? 'AED' : '₽'}</span>
         <input type="number" id="phPriceIn" min="1" step="1" value="${price}" inputmode="numeric"></label>
       <input type="range" id="phSlider" min="${M.PRICE_MIN}" max="${M.PRICE_MAX}" step="0.05" value="${Math.min(M.PRICE_MAX, sellK)}">
       <div class="phRow phMuted"><span id="phK">${info.line1}</span><span id="phSpeed">${info.speed}</span></div>
@@ -234,10 +236,12 @@ const Phone = (() => {
     if (!list.length) h += '<div class="phEmpty">Сообщений пока нет. Выставь номер — покупатели напишут сами.</div>';
     for (const c of list) {
       const last = c.msgs[c.msgs.length - 1];
-      const tag = c.status === 'deal' ? '<em class="ok">сделка</em>' : c.status === 'gone' ? '<em>закрыт</em>' : c.reply ? '<em>печатает…</em>' : '';
+      const tag = c.status === 'deal' ? '<em class="ok">сделка</em>' : c.status === 'gone' ? '<em>закрыт</em>' : c.reply ? '<em>печатает…</em>'
+        : c.kind !== 'buy' && c.buyer.type === 'lowball' ? '<em class="lb">🤡 лоуболлер</em>'
+        : c.kind !== 'buy' && c.buyer.type === 'collector' ? '<em class="ok">🧐 коллекционер</em>' : '';
       h += `<button class="phChatRow ${c.unread ? 'unread' : ''}" data-act="openChat" data-id="${c.id}">
         <span class="phAva">${c.buyer.ava}</span>
-        <span class="phChatMid"><b>${c.kind === 'buy' ? '🛍 ' : ''}${esc(c.buyer.name)}</b> ${tag}<small>${esc(Market.curOf(c.plate) === 'usd' ? UI.plateText(c.plate) : c.plate)} · ${esc(last.text)}</small></span>
+        <span class="phChatMid"><b>${c.kind === 'buy' ? '🛍 ' : ''}${esc(c.buyer.name)}</b> ${tag}<small>${esc(Market.curOf(c.plate) !== 'rub' ? UI.plateText(c.plate) : c.plate)} · ${esc(last.text)}</small></span>
         <span class="phTime">${timeStr(last.t)}</span></button>`;
     }
     return h + '</div>' + tabBar();
@@ -250,7 +254,7 @@ const Phone = (() => {
     if (c.kind === 'buy') return screenBuyChat(c);
     const l = Market.listings().find(x => x.id === c.lid);
     let h = appHeader(`${c.buyer.ava} ${esc(c.buyer.name)}`, 'chats') + `<div class="phBody phChatBody" id="phChatBody">
-      <div class="phChatPlate">${UI.plateHTML(c.plate, Plates.classify(c.plate), 'phPlate')}
+      <div class="phChatPlate">${UI.plateHTML(c.plate, State.rarityOf(c.plate), 'phPlate')}
         <span>${l ? `объявление: <b>${Market.money(l.price, c.cur)}</b>` : 'объявление закрыто'}${TYPE[c.buyer.type] ? ` · <i>${TYPE[c.buyer.type]}</i>` : ''}</span></div>`;
     for (const m of c.msgs) {
       if (m.from === 'sys') { h += `<div class="phSys">${esc(m.text)}</div>`; continue; }
@@ -274,7 +278,7 @@ const Phone = (() => {
   function screenBuyChat(c) {
     const o = Market.offers().find(x => x.id === c.oid);
     let h = appHeader(`${c.buyer.ava} ${esc(c.buyer.name)}`, 'chats') + `<div class="phBody phChatBody" id="phChatBody">
-      <div class="phChatPlate">${UI.plateHTML(c.plate, Plates.classify(c.plate), 'phPlate')}
+      <div class="phChatPlate">${UI.plateHTML(c.plate, State.rarityOf(c.plate), 'phPlate')}
         <span>${o ? `цена: <b>${Market.money(o.price, c.cur)}</b> · оценка ${Market.money(o.est, c.cur)} · ⏳ ${left(o.until)}` : 'объявление закрыто'}${SELLER[c.buyer.type] ? ` · <i>${SELLER[c.buyer.type]}</i>` : ''}</span></div>`;
     for (const m of c.msgs) {
       if (m.from === 'sys') { h += `<div class="phSys">${esc(m.text)}</div>`; continue; }
@@ -304,8 +308,16 @@ const Phone = (() => {
       <div class="phRow"><span>Сделок</span><b>${fmt(Market.deals())}</b></div>
       <div class="phRow"><span>Слотов</span><b>${Market.slots()}</b></div>
       <div class="phRow"><span>Отшито лоуболлеров</span><b>${fmt(s.stats.lowballs || 0)}</b></div>
-      <div class="phHint">Рейтинг растёт от сделок: каждый уровень — покупатели пишут на 3% быстрее и готовы платить на 2% больше.
-        Слоты докупаются в магазине. «Поднять» — объявление 10 минут в топе, покупатели пишут втрое быстрее.</div>
+      <div class="phRating">
+        <b>Что даёт рейтинг ${lvl}/${M.RATING_MAX}</b>
+        <div class="phRow"><span>Покупатели пишут быстрее</span><b>${lvl ? `−${lvl * 3}%` : '—'}</b></div>
+        <div class="phRow"><span>Покупатели платят больше</span><b>${lvl ? `+${lvl * 2}%` : '—'}</b></div>
+        <div class="phHint">${lvl < M.RATING_MAX
+          ? `До рейтинга ${lvl + 1} — ещё ${fmt((lvl + 1) * (lvl + 1) - Market.deals())} сделок. Каждый уровень: −3% ожидания и +2% к цене, максимум ${M.RATING_MAX} (это 100 сделок).`
+          : 'Максимальный рейтинг!'}</div>
+      </div>
+      <div class="phHint">🤡 Лоуболлеры предлагают 25–50% от оценки — отшивай их кнопкой ✖ (за 10 отшитых есть ачивка).
+        🧐 Коллекционеры платят больше оценки. Слоты докупаются в магазине. «Поднять» — объявление 10 минут в топе.</div>
     </div>` + tabBar();
   }
 
@@ -318,10 +330,21 @@ const Phone = (() => {
       chat: screenChat, profile: screenProfile }[tab] || screenMine)();
     // сохраняем ввод встречной цены между перерисовками
     const keep = $('phCounter') ? $('phCounter').value : null;
+    const view = locked ? 'lock' : tab + (tab === 'chat' ? chatId : '');
+    const oldBody = scr.querySelector('.phBody');
+    const oldTop = oldBody ? oldBody.scrollTop : 0;
+    const oldMsgs = scr.querySelectorAll('.phMsg').length;
+    const wasBottom = oldBody ? oldBody.scrollHeight - oldBody.scrollTop - oldBody.clientHeight < 40 : true;
     scr.innerHTML = html;
     if (keep !== null && $('phCounter')) $('phCounter').value = keep;
-    const body = $('phChatBody');
-    if (body) body.scrollTop = body.scrollHeight;
+    const body = scr.querySelector('.phBody');
+    if (body) {
+      const same = view === lastView;
+      if ($('phChatBody')) { // чат: к последнему сообщению, если оно новое или мы и так были внизу
+        body.scrollTop = !same || wasBottom || scr.querySelectorAll('.phMsg').length !== oldMsgs ? body.scrollHeight : oldTop;
+      } else if (same) body.scrollTop = oldTop; // списки не прыгают наверх при ежесекундном обновлении
+    }
+    lastView = view;
     bind();
   }
 

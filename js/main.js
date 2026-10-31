@@ -47,6 +47,7 @@
     }
     const { plate, rarity, resolve } = pending;
     pending = null;
+    State.clearPending();
     UI.hideChoice();
     let events = [];
     if (keep) {
@@ -57,6 +58,7 @@
       const v = State.sellPending(plate);
       UI.toast(`Продано: +${UI.money(v, plate)}`);
       Snd.buy();
+      UI.coinsToWallet(Math.min(24, 6 + CFG.TIER[rarity] * 3));
     }
     events = events.concat(State.checkNow()); // ачивки и вехи сразу, а не при заходе в магазин
     UI.markChoiceDone(keep, State.sellValue(plate), plate);
@@ -97,14 +99,17 @@
     // удача даёт шанс на второй бросок.
     let tries = 1, how = null;
     if (charge) { tries = charge.mult; how = 'charge' + charge.mult; }
-    else if (!opts.auto && State.useTicket()) {
+    else if (!opts.auto && (State.get().bonusCharge || 0) > 0) {
+      tries = State.useBonusCharge();
+      how = 'charge' + tries;
+      UI.toast(`🎁 Заряд из бонуса за вход: лучший из ${tries}!`);
+    } else if (!opts.auto && State.useTicket()) {
       tries = CFG.LEVEL.TICKET_TRIES;
       how = 'ticket';
       UI.toast(`🎟 Билет заряда: лучший из ${tries}!`);
     }
     if (raidActive()) { tries *= CFG.RAID.TRIES_MULT; how = how || 'raid'; }
     if (devNextTries) { tries = Math.max(tries, devNextTries); devNextTries = 0; }
-    if (tries === 1 && Math.random() < s.up.luck * CFG.LUCK_PER_LVL) tries = 2;
     tries *= devLuck;
     UI.refreshHUD();
     const res = Plates.rollSpin(Math.random, {
@@ -141,6 +146,8 @@
     }
     if (!dark && res.tier >= CFG.TIER.legendary) {
       FX.flash(rc.color);
+      FX.ring(cx, cy, rc.color, 480);
+      FX.coins(40);
       FX.rain([rc.color, '#ffe17d', '#ffffff'], 120);
       if (!s.settings.lowfx) await UI.bigMoment(res.plate, res.rarity);
     }
@@ -159,6 +166,7 @@
         // игрок решает сам
         UI.showResult(res, out);
         UI.showChoice(res.plate);
+        State.setPending({ plate: res.plate, rarity: res.rarity, value: out.value });
         kept = await new Promise(resolve => { pending = { plate: res.plate, rarity: res.rarity, resolve }; });
       }
     } else {
@@ -226,12 +234,48 @@
     if (Date.now() - lastSpinEnd >= pause) doSpin({ auto: true });
   }, 120);
 
-  // периодический сейв; незакрытый выбор при выходе уходит в гараж
+  // периодический сейв (невыбранный номер хранится в сейве и ждёт до следующего входа)
   setInterval(() => State.doSave(), 30000);
-  window.addEventListener('beforeunload', () => {
-    if (pending && State.canKeep(pending.plate)) State.keepPlate(pending.plate, pending.rarity);
-    else if (pending) State.sellPending(pending.plate);
-  });
+
+  // номер, выпавший перед закрытием игры, снова ждёт решения
+  (() => {
+    const p = State.get().pending;
+    if (!p) return;
+    if (State.get().found[p.plate] || !Plates.classify(p.plate)) { State.clearPending(); return; }
+    const res = { plate: p.plate, rarity: p.rarity, tier: CFG.TIER[p.rarity], trig: null };
+    const black = res.tier >= CFG.TIER.mythic ? 'blackPlate' : '';
+    UI.showPlate(p.plate, p.rarity, black);
+    UI.showResult(res, { kind: 'choice', value: p.value });
+    UI.showChoice(p.plate);
+    pending = { plate: p.plate, rarity: p.rarity, resolve: () => {} };
+    UI.toast('Номер с прошлого раза ждёт решения: продать или в гараж?');
+  })();
+
+  // «Что нового» — один раз после обновления (новичку не показываем)
+  (() => {
+    const s = State.get();
+    if (s.seenVersion === CFG.VERSION) return;
+    const veteran = s.spins > 0;
+    s.seenVersion = CFG.VERSION;
+    State.markDirty();
+    if (veteran) UI.openOverlay('news');
+  })();
+
+  // бонус за вход: сегодня ещё не забран — показываем (после «Что нового», если оно открыто)
+  // окно — один раз за день, а не при каждом возвращении во вкладку (забрать можно и позже)
+  let loginShownFor = null;
+  const showLogin = () => {
+    if (!State.loginCheck()) return;
+    const day = State.get().login.last;
+    if (loginShownFor === day) return;
+    loginShownFor = day;
+    UI.openOverlay('daily');
+  };
+  setTimeout(showLogin, 400);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) showLogin(); });
+
+  // накопленные при загрузке события (возврат денег, награды за починку коллекций) — сразу
+  { const ev = State.checkNow(); if (ev.length) setTimeout(() => UI.showEvents(ev), 600); }
 
   // --- тест-хук для headless-прогона ---
   window.__nom = {
